@@ -165,7 +165,9 @@ def export_sales_csv(
     w.writerow(["sale_id", "date", "client", "client_type", "status", "currency",
                 "total_amount", "payment_date", "product_sku", "product_name",
                 "quantity_boxes", "unit_price", "subtotal"])
-    for sale in db.scalars(stmt).all():
+    # `.unique()` is required when iterating SQLAlchemy 2.x rows with joined-eager
+    # relationships (Sale.items + Sale.client are both `lazy="joined"`).
+    for sale in db.scalars(stmt).unique().all():
         if not sale.items:
             w.writerow([sale.id, sale.sale_date.isoformat(),
                         sale.client.name if sale.client else "",
