@@ -4,14 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Chika brand palette — sampled from design_chika/ assets
         chika: {
-          50:  '#fef7ed',
-          100: '#fdedd3',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          900: '#78350f',
+          paprika:    '#C5532E',
+          paprikaDeep:'#9B3A1A',
+          ocre:       '#E89B27',
+          ocreDeep:   '#B47A1B',
+          cream:      '#F7E9C5',
+          creamSoft:  '#FAF4E2',
+          brown:      '#4A2218',
+          leaf:       '#6B7F3A',
         },
+      },
+      fontFamily: {
+        display: ['"Fraunces"', 'Georgia', 'serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
     },
   },
