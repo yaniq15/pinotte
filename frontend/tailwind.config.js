@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
+const CHIKA_SHADES = ['paprika', 'paprikaDeep', 'ocre', 'ocreDeep', 'cream', 'creamSoft', 'brown', 'leaf']
+const CHIKA_PROPS  = ['bg', 'text', 'ring', 'border', 'shadow', 'fill', 'stroke', 'hover:bg', 'hover:text']
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // Safelist brand-color utilities so a stale dev-server cache never ships
+  // the white-on-white "Nouveau produit" bug again.
+  safelist: CHIKA_PROPS.flatMap(p => CHIKA_SHADES.map(s => `${p}-chika-${s}`)),
   theme: {
     extend: {
       colors: {
