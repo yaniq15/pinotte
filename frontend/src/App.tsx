@@ -5,6 +5,8 @@ import RegisterPage from './pages/RegisterPage'
 import HomePage from './pages/HomePage'
 import ProductsPage from './pages/ProductsPage'
 import BatchesPage from './pages/BatchesPage'
+import InventoryPage from './pages/InventoryPage'
+import MovementsPage from './pages/MovementsPage'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AppLayout from './components/shared/AppLayout'
 
@@ -27,6 +29,8 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/produits" element={<ProductsPage />} />
               <Route path="/lots" element={<BatchesPage />} />
+              <Route path="/inventaire" element={<InventoryPage />} />
+              <Route path="/mouvements" element={<MovementsPage />} />
             </Route>
           </Route>
 

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models.batch import Batch
+from ..models.movement import Movement
 from ..models.product import Product
 from ..models.user import User
 from ..schemas.batch import BatchCreate, BatchUpdate
@@ -22,8 +23,24 @@ def get_by_id(db: Session, batch_id: int) -> Optional[Batch]:
 
 
 def create(db: Session, payload: BatchCreate, created_by: User) -> Batch:
+    """Create a batch AND its associated PRODUCTION stock movement in one
+    transaction. Per Phase 3 spec — stock is never stored, it's the sum of
+    movements, so a batch without its matching movement would be invisible to
+    the inventory."""
     batch = Batch(**payload.model_dump(), created_by=created_by.id)
     db.add(batch)
+    db.flush()  # need batch.id for the movement's reference_id
+    db.add(Movement(
+        product_id=batch.product_id,
+        batch_id=batch.id,
+        created_by=created_by.id,
+        movement_type="PRODUCTION",
+        quantity_boxes=batch.quantity_boxes,
+        reference_type="batch",
+        reference_id=batch.id,
+        movement_date=batch.production_date,
+        notes=f"Production lot {batch.batch_number}",
+    ))
     db.commit()
     db.refresh(batch)
     return batch
