@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, ChevronRight } from 'lucide-react'
+import { LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, ChevronRight } from 'lucide-react'
 import { useCurrentUser, clearToken } from '../../hooks/useAuth'
 import { BRAND } from '../../lib/brand'
 
@@ -10,6 +10,8 @@ const NAV_ITEMS = [
   { to: '/lots',       label: 'Lots',            icon: Boxes },
   { to: '/inventaire', label: 'Inventaire',      icon: Warehouse },
   { to: '/mouvements', label: 'Mouvements',      icon: ArrowLeftRight },
+  { to: '/clients',    label: 'Clients',         icon: Users },
+  { to: '/ventes',     label: 'Ventes',          icon: Receipt },
 ]
 
 export default function AppLayout() {

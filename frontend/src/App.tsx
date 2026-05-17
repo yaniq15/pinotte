@@ -7,6 +7,8 @@ import ProductsPage from './pages/ProductsPage'
 import BatchesPage from './pages/BatchesPage'
 import InventoryPage from './pages/InventoryPage'
 import MovementsPage from './pages/MovementsPage'
+import ClientsPage from './pages/ClientsPage'
+import SalesPage from './pages/SalesPage'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AppLayout from './components/shared/AppLayout'
 
@@ -31,6 +33,8 @@ export default function App() {
               <Route path="/lots" element={<BatchesPage />} />
               <Route path="/inventaire" element={<InventoryPage />} />
               <Route path="/mouvements" element={<MovementsPage />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/ventes" element={<SalesPage />} />
             </Route>
           </Route>
 

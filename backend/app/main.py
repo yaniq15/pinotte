@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routes import auth as auth_routes
 from .api.routes import batches as batch_routes
+from .api.routes import clients as client_routes
 from .api.routes import inventory as inventory_routes
 from .api.routes import movements as movement_routes
 from .api.routes import products as product_routes
+from .api.routes import sales as sale_routes
 from .core.config import settings
 from .core.database import SessionLocal
 from .core.seed import seed_products
@@ -53,6 +55,8 @@ def create_app() -> FastAPI:
     app.include_router(batch_routes.router,     prefix="/api")
     app.include_router(inventory_routes.router, prefix="/api")
     app.include_router(movement_routes.router,  prefix="/api")
+    app.include_router(client_routes.router,    prefix="/api")
+    app.include_router(sale_routes.router,      prefix="/api")
 
     return app
 
