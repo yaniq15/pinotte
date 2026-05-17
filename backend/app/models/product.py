@@ -1,8 +1,8 @@
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Integer, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base, TimestampMixin
 
@@ -15,6 +15,12 @@ class Product(Base, TimestampMixin):
         → minus store_margin (35%) = prix_coutant_magasin  →  price_direct
         → minus distribution_rate (18%/19%, set per BROKER client)
                                                             = cost_net_distributeur  →  price_broker
+
+    Recipe cost (Phase 8):
+      `batch_yield_units` × `units_per_box` together with `ingredients` allow
+      computing the production cost per unit (= sum of ingredient line costs /
+      batch_yield_units). When the user "applies" the computed cost, it is
+      written to `unit_cost`.
     """
     __tablename__ = "products"
     __table_args__ = (CheckConstraint("units_per_box > 0", name="ck_units_per_box_positive"),)
@@ -25,19 +31,44 @@ class Product(Base, TimestampMixin):
     units_per_box: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
+    # Recipe yield: how many units (jars/bags) does ONE reference batch produce.
+    batch_yield_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     # Suggested consumer price (Prix de vente consommateur — PDS)
     consumer_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    # Store margin %, e.g. 0.35 for 35%
     store_margin_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4), nullable=True)
 
-    # Cached/computed prices per channel (kept for fast queries + override possibility):
-    #   price_direct = consumer_price × (1 − store_margin_pct)
-    #   price_broker = price_direct × (1 − client.distribution_rate_pct)
-    # When a sale is created, the actual unit_price comes from the client's distribution
-    # rate (BROKER) or price_direct (STORE), unless overridden manually in the UI.
     price_broker: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     price_direct: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
     currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    ingredients = relationship(
+        "ProductIngredient",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductIngredient.sort_order",
+        lazy="selectin",
+    )
+
+
+class ProductIngredient(Base, TimestampMixin):
+    """One ingredient line in a product's recipe — quantity for ONE batch."""
+    __tablename__ = "product_ingredients"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    # Free-form unit label: 'g', 'kg', 'ml', 'L', 'unité', 'oz' … — we don't
+    # try to normalise units server-side; the user enters the quantity AND
+    # the unit_price in the same unit, so the math is unit-agnostic.
+    unit: Mapped[str] = mapped_column(String(20), nullable=False, default="g")
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 6), nullable=True,
+        comment="Price per ONE unit (whatever the unit is — $/g, $/ml, etc.)")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    product = relationship("Product", back_populates="ingredients")
