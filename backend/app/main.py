@@ -3,30 +3,34 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from .api.routes import auth as auth_routes
 from .api.routes import batches as batch_routes
 from .api.routes import clients as client_routes
+from .api.routes import expenses as expense_routes
 from .api.routes import inventory as inventory_routes
 from .api.routes import movements as movement_routes
 from .api.routes import products as product_routes
+from .api.routes import reports as report_routes
 from .api.routes import sales as sale_routes
 from .core.config import settings
 from .core.database import SessionLocal
 from .core.seed import seed_products
+from .core.seed_categories import seed_categories
 from .crud import movement as movement_crud
 from .models.user import User
-from sqlalchemy import select
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Idempotent seed at startup so the 3 Chika products always exist.
     with SessionLocal() as db:
         n = seed_products(db)
         if n:
             print(f"[seed] inserted {n} Chika product(s)")
-        # Phase 3 backfill — make sure pre-Phase-3 batches have a PRODUCTION movement.
+        nc = seed_categories(db)
+        if nc:
+            print(f"[seed] inserted {nc} expense categor{'y' if nc == 1 else 'ies'}")
         fallback_user = db.scalar(select(User).order_by(User.id).limit(1))
         if fallback_user:
             bf = movement_crud.backfill_production_for_existing_batches(db, fallback_user.id)
@@ -57,6 +61,8 @@ def create_app() -> FastAPI:
     app.include_router(movement_routes.router,  prefix="/api")
     app.include_router(client_routes.router,    prefix="/api")
     app.include_router(sale_routes.router,      prefix="/api")
+    app.include_router(expense_routes.router,   prefix="/api")
+    app.include_router(report_routes.router,    prefix="/api")
 
     return app
 
