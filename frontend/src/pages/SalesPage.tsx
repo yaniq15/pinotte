@@ -3,17 +3,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, Truck, DollarSign, Ban, Trash2 } from 'lucide-react'
 import {
   listSales, createSale, updateSaleStatus,
-  type Sale, type SaleStatus, type SalePayload, type SaleItemPayload,
+  type SaleStatus, type SalePayload, type SaleItemPayload,
 } from '../api/sales'
 import { listClients, type Client } from '../api/clients'
 import { listProducts, type Product } from '../api/products'
 import { PageHeader } from '../components/shared/AppLayout'
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
+import { EmptyState } from '../components/ui/EmptyState'
 
-const STATUS_META: Record<SaleStatus, { label: string; cls: string }> = {
-  PENDING:   { label: 'En attente', cls: 'bg-stone-200 text-stone-700' },
-  DELIVERED: { label: 'Livrée',     cls: 'bg-blue-100 text-blue-700' },
-  PAID:      { label: 'Payée',      cls: 'bg-emerald-100 text-emerald-700' },
-  CANCELLED: { label: 'Annulée',    cls: 'bg-red-100 text-red-700' },
+const STATUS_META: Record<SaleStatus, { label: string; tone: 'neutral' | 'info' | 'success' | 'danger' }> = {
+  PENDING:   { label: 'En attente', tone: 'neutral' },
+  DELIVERED: { label: 'Livrée',     tone: 'info' },
+  PAID:      { label: 'Payée',      tone: 'success' },
+  CANCELLED: { label: 'Annulée',    tone: 'danger' },
 }
 
 const fmtCAD = (v: number | string) =>
@@ -52,108 +56,110 @@ export default function SalesPage() {
   })
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-6xl">
+    <div className="px-6 lg:px-10 py-8 max-w-7xl">
       <PageHeader
         title="Ventes"
         description="Bons de vente courtier et magasin direct."
         action={
-          <button onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
-            <Plus size={16} /> Nouvelle vente
-          </button>
+          <Button icon={<Plus size={16} />} onClick={() => setShowForm(true)}>
+            Nouvelle vente
+          </Button>
         }
       />
 
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 mb-4 flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Client :</label>
-          <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-            className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Tous</option>
-            {clients.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+      <Card className="mb-4">
+        <div className="p-4 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-stone-600">Client</label>
+            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+              className="px-3 py-1.5 ring-1 ring-stone-200 bg-white rounded-lg text-sm">
+              <option value="">Tous</option>
+              {clients.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-stone-600">Statut</label>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              className="px-3 py-1.5 ring-1 ring-stone-200 bg-white rounded-lg text-sm">
+              <option value="">Tous</option>
+              {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Statut :</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Tous</option>
-            {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-          </select>
-        </div>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
-            <tr>
-              <th className="text-left px-4 py-3">#</th>
-              <th className="text-left px-4 py-3">Date</th>
-              <th className="text-left px-4 py-3">Client</th>
-              <th className="text-left px-4 py-3 hidden sm:table-cell">Articles</th>
-              <th className="text-right px-4 py-3">Total</th>
-              <th className="text-left px-4 py-3">Statut</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(sales.data ?? []).map(s => {
-              const meta = STATUS_META[s.status]
-              return (
-                <tr key={s.id} className="border-t border-stone-100 hover:bg-stone-50">
-                  <td className="px-4 py-3 font-mono text-xs text-stone-500">#{s.id}</td>
-                  <td className="px-4 py-3 text-stone-700">{fmtDate(s.sale_date)}</td>
-                  <td className="px-4 py-3 font-semibold text-stone-900">{s.client_name}</td>
-                  <td className="px-4 py-3 text-stone-600 hidden sm:table-cell text-xs">
-                    {s.items.map(it => `${it.quantity_boxes}× ${it.product_name}`).join(', ')}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums font-bold text-chika-paprika">{fmtCAD(s.total_amount)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${meta.cls}`}>
-                      {meta.label}
-                    </span>
-                    {s.payment_date && (
-                      <div className="text-[10px] text-stone-400 mt-0.5">Payée le {fmtDate(s.payment_date)}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex gap-1 justify-end">
-                      {s.status === 'PENDING' && (
-                        <button onClick={() => transitionMut.mutate({ id: s.id, status: 'DELIVERED' })}
-                          title="Marquer livré"
-                          className="text-xs text-blue-700 hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
-                          <Truck size={12} /> Livré
-                        </button>
-                      )}
-                      {s.status === 'DELIVERED' && (
-                        <button onClick={() => transitionMut.mutate({ id: s.id, status: 'PAID' })}
-                          title="Marquer payé"
-                          className="text-xs text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
-                          <DollarSign size={12} /> Payé
-                        </button>
-                      )}
-                      {(s.status === 'PENDING' || s.status === 'DELIVERED') && (
-                        <button onClick={() => {
-                          if (window.confirm('Annuler cette vente ? Le stock sera restauré.')) {
-                            transitionMut.mutate({ id: s.id, status: 'CANCELLED' })
-                          }
-                        }}
-                          title="Annuler"
-                          className="text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded flex items-center gap-1">
-                          <Ban size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-            {sales.data && sales.data.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-400">Aucune vente.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        {sales.isLoading
+          ? <div className="p-8 text-center text-stone-400 text-sm">Chargement…</div>
+          : sales.data && sales.data.length === 0
+          ? <EmptyState icon="🧾" title="Aucune vente" description="Enregistre ta première vente pour commencer."
+              action={<Button icon={<Plus size={16} />} onClick={() => setShowForm(true)}>Nouvelle vente</Button>} />
+          : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
+                  <tr>
+                    <th className="text-left px-5 py-3">#</th>
+                    <th className="text-left px-5 py-3">Date</th>
+                    <th className="text-left px-5 py-3">Client</th>
+                    <th className="text-left px-5 py-3 hidden sm:table-cell">Articles</th>
+                    <th className="text-right px-5 py-3">Total</th>
+                    <th className="text-left px-5 py-3">Statut</th>
+                    <th className="px-5 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(sales.data ?? []).map(s => {
+                    const meta = STATUS_META[s.status]
+                    return (
+                      <tr key={s.id} className="border-t border-stone-100 hover:bg-stone-50 transition">
+                        <td className="px-5 py-3 font-mono text-xs text-stone-500">#{s.id}</td>
+                        <td className="px-5 py-3 text-stone-700">{fmtDate(s.sale_date)}</td>
+                        <td className="px-5 py-3 font-medium text-stone-900">{s.client_name}</td>
+                        <td className="px-5 py-3 text-stone-600 hidden sm:table-cell text-xs">
+                          {s.items.map(it => `${it.quantity_boxes}× ${it.product_name}`).join(', ')}
+                        </td>
+                        <td className="px-5 py-3 text-right tabular-nums font-semibold text-stone-900">{fmtCAD(s.total_amount)}</td>
+                        <td className="px-5 py-3">
+                          <Badge tone={meta.tone}>{meta.label}</Badge>
+                          {s.payment_date && (
+                            <div className="text-[10px] text-stone-400 mt-0.5">Payée le {fmtDate(s.payment_date)}</div>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <div className="flex gap-1 justify-end">
+                            {s.status === 'PENDING' && (
+                              <Button size="sm" variant="secondary" icon={<Truck size={12} />}
+                                onClick={() => transitionMut.mutate({ id: s.id, status: 'DELIVERED' })}>
+                                Livrée
+                              </Button>
+                            )}
+                            {s.status === 'DELIVERED' && (
+                              <Button size="sm" variant="primary" icon={<DollarSign size={12} />}
+                                onClick={() => transitionMut.mutate({ id: s.id, status: 'PAID' })}>
+                                Payée
+                              </Button>
+                            )}
+                            {(s.status === 'PENDING' || s.status === 'DELIVERED') && (
+                              <Button size="sm" variant="danger" icon={<Ban size={12} />}
+                                onClick={() => {
+                                  if (window.confirm('Annuler cette vente ? Le stock sera restauré.')) {
+                                    transitionMut.mutate({ id: s.id, status: 'CANCELLED' })
+                                  }
+                                }}>
+                                Annuler
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </Card>
 
       {showForm && (
         <SaleForm onClose={() => setShowForm(false)} onSaved={() => {
@@ -193,7 +199,6 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   function pickProduct(i: number, productId: string) {
     const pid = Number(productId)
     const product: Product | undefined = products.data?.find(p => p.id === pid)
-    // Auto-fill unit_price based on client type
     let price = 0
     if (product && selectedClient) {
       const raw = selectedClient.type === 'BROKER' ? product.price_broker : product.price_direct
@@ -238,12 +243,12 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-stone-900">Nouvelle vente</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
-        {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
+        {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Client">
@@ -262,15 +267,15 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         </div>
 
         {selectedClient && (
-          <div className="text-xs text-chika-paprikaDeep bg-chika-creamSoft border border-chika-cream px-3 py-2 rounded-lg">
+          <div className="text-xs text-chika-paprikaDeep bg-chika-creamSoft ring-1 ring-chika-cream px-3 py-2 rounded-lg">
             Prix unitaire pré-rempli selon le type <strong>{selectedClient.type === 'BROKER' ? 'courtier' : 'direct'}</strong>. Tu peux modifier.
           </div>
         )}
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-semibold text-stone-600">Articles</label>
-            <button onClick={addLine} type="button" className="text-xs text-chika-paprika hover:underline">+ Ajouter une ligne</button>
+            <label className="text-xs font-medium text-stone-700">Articles</label>
+            <button onClick={addLine} type="button" className="text-xs text-chika-paprika hover:underline font-semibold">+ Ajouter une ligne</button>
           </div>
           <div className="space-y-2">
             {lines.map((l, i) => (
@@ -299,17 +304,16 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputCls} />
         </Field>
 
-        <div className="flex items-center justify-between border-t border-stone-200 pt-3">
+        <div className="flex items-center justify-between border-t border-stone-100 pt-4">
           <div>
             <div className="text-xs text-stone-500 uppercase tracking-wider">Total</div>
             <div className="text-2xl font-bold text-chika-paprika tabular-nums">{fmtCAD(total)}</div>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">Annuler</button>
-            <button type="button" onClick={() => mut.mutate()} disabled={mut.isPending}
-              className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+            <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
               {mut.isPending ? '…' : 'Créer la vente'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -317,12 +321,12 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   )
 }
 
-const inputCls = "w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-chika-paprika focus:border-chika-paprika focus:outline-none text-sm"
+const inputCls = "w-full px-3 py-2 ring-1 ring-stone-300 rounded-lg focus:ring-2 focus:ring-chika-paprika focus:outline-none text-sm bg-white"
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-stone-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-stone-700 mb-1">{label}</label>
       {children}
     </div>
   )
