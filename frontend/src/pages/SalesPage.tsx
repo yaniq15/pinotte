@@ -201,8 +201,22 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     const product: Product | undefined = products.data?.find(p => p.id === pid)
     let price = 0
     if (product && selectedClient) {
-      const raw = selectedClient.type === 'BROKER' ? product.price_broker : product.price_direct
-      price = typeof raw === 'string' ? parseFloat(raw) : (raw || 0)
+      const direct = typeof product.price_direct === 'string' ? parseFloat(product.price_direct) : (product.price_direct || 0)
+      if (selectedClient.type === 'STORE') {
+        price = direct
+      } else {
+        // BROKER: re-derive from the client's actual distribution rate.
+        // If client has no rate, fall back to the stored price_broker.
+        const distribRate = typeof selectedClient.distribution_rate_pct === 'string'
+          ? parseFloat(selectedClient.distribution_rate_pct)
+          : (selectedClient.distribution_rate_pct ?? null)
+        if (distribRate !== null && !isNaN(distribRate) && direct > 0) {
+          price = +(direct * (1 - distribRate)).toFixed(2)
+        } else {
+          const fallback = typeof product.price_broker === 'string' ? parseFloat(product.price_broker) : (product.price_broker || 0)
+          price = fallback
+        }
+      }
     }
     updateLine(i, { product_id: pid, unit_price: price })
   }

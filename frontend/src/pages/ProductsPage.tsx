@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, X } from 'lucide-react'
+import { Plus, Pencil, X, ChevronRight } from 'lucide-react'
 import {
   listProducts, createProduct, updateProduct, deleteProduct,
   type Product, type ProductPayload,
@@ -19,6 +19,8 @@ const schema = z.object({
   sku: z.string().min(1, 'Requis'),
   units_per_box: z.coerce.number().int().positive('> 0 requis'),
   unit_cost: z.coerce.number().min(0).optional().or(z.literal('')),
+  consumer_price: z.coerce.number().min(0).optional().or(z.literal('')),
+  store_margin_pct: z.coerce.number().min(0).max(1).optional().or(z.literal('')),
   price_broker: z.coerce.number().min(0).optional().or(z.literal('')),
   price_direct: z.coerce.number().min(0).optional().or(z.literal('')),
   currency: z.string().length(3).default('CAD'),
@@ -28,11 +30,18 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const fmtCAD = (v: number | string | null | undefined) => {
-  if (v === null || v === undefined || v === '') return '—'
+const num = (v: number | string | null | undefined): number | null => {
+  if (v === null || v === undefined || v === '') return null
   const n = typeof v === 'string' ? parseFloat(v) : v
-  if (!isFinite(n)) return '—'
-  return new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(n)
+  return isFinite(n) ? n : null
+}
+const fmtCAD = (v: number | string | null | undefined) => {
+  const n = num(v)
+  return n === null ? '—' : new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(n)
+}
+const fmtPct = (v: number | string | null | undefined) => {
+  const n = num(v)
+  return n === null ? '—' : `${(n * 100).toFixed(0)} %`
 }
 
 export default function ProductsPage() {
@@ -40,12 +49,13 @@ export default function ProductsPage() {
   const { data: products = [], isLoading } = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [editing, setEditing] = useState<Product | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [expanded, setExpanded] = useState<number | null>(null)
 
   return (
     <div className="px-6 lg:px-10 py-8 max-w-7xl">
       <PageHeader
         title="Produits"
-        description="Catalogue Chika — prix courtier vs direct et coûts unitaires."
+        description="Catalogue Chika — structure de prix complète (PDS → marge magasin → distribution)."
         action={
           <Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>
             Nouveau produit
@@ -64,44 +74,67 @@ export default function ProductsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                   <tr>
+                    <th className="text-left px-5 py-3 w-12"></th>
                     <th className="text-left px-5 py-3">Produit</th>
                     <th className="text-left px-5 py-3 hidden sm:table-cell">SKU</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Unités/boîte</th>
-                    <th className="text-right px-5 py-3">Coût unit.</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Prix courtier</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Prix direct</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">U/cs</th>
+                    <th className="text-right px-5 py-3">PDS</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">Prix magasin</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">Net distrib.</th>
                     <th className="text-center px-5 py-3">Statut</th>
                     <th className="px-5 py-3 w-12"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => (
-                    <tr key={p.id} className={`border-t border-stone-100 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          {p.image_url && (
-                            <img src={p.image_url} alt={p.name}
-                                 className="w-10 h-10 object-contain rounded-md bg-stone-50 ring-1 ring-stone-100 shrink-0" />
-                          )}
-                          <span className="font-medium text-stone-900">{p.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 font-mono text-xs text-stone-500 hidden sm:table-cell">{p.sku}</td>
-                      <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-600">{p.units_per_box}</td>
-                      <td className="px-5 py-3 text-right tabular-nums text-stone-700">{fmtCAD(p.unit_cost)}</td>
-                      <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700">{fmtCAD(p.price_broker)}</td>
-                      <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-900 font-semibold">{fmtCAD(p.price_direct)}</td>
-                      <td className="px-5 py-3 text-center">
-                        {p.active ? <Badge tone="success">Actif</Badge> : <Badge tone="neutral">Inactif</Badge>}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button onClick={() => { setEditing(p); setShowForm(true) }}
-                          className="text-stone-400 hover:text-chika-paprika p-1" title="Modifier">
-                          <Pencil size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {products.map(p => {
+                    const isOpen = expanded === p.id
+                    const upb = p.units_per_box
+                    const costNet = num(p.price_broker)
+                    const caisseValue = costNet !== null ? costNet * upb : null
+                    return (
+                      <>
+                        <tr key={p.id} className={`border-t border-stone-100 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
+                          <td className="px-5 py-3">
+                            <button onClick={() => setExpanded(isOpen ? null : p.id)}
+                              className="text-stone-400 hover:text-stone-700">
+                              <ChevronRight size={14} className={`transition ${isOpen ? 'rotate-90' : ''}`} />
+                            </button>
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3">
+                              {p.image_url && (
+                                <img src={p.image_url} alt={p.name}
+                                     className="w-10 h-10 object-contain rounded-md bg-stone-50 ring-1 ring-stone-100 shrink-0" />
+                              )}
+                              <span className="font-medium text-stone-900">{p.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-stone-500 hidden sm:table-cell">{p.sku}</td>
+                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-600">{upb}</td>
+                          <td className="px-5 py-3 text-right tabular-nums font-semibold text-chika-paprika">{fmtCAD(p.consumer_price)}</td>
+                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700">{fmtCAD(p.price_direct)}</td>
+                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-900 font-semibold">{fmtCAD(p.price_broker)}</td>
+                          <td className="px-5 py-3 text-center">
+                            {p.active ? <Badge tone="success">Actif</Badge> : <Badge tone="neutral">Inactif</Badge>}
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <button onClick={() => { setEditing(p); setShowForm(true) }}
+                              className="text-stone-400 hover:text-chika-paprika p-1" title="Modifier">
+                              <Pencil size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="bg-chika-creamSoft/40 border-t border-stone-100">
+                            <td></td>
+                            <td colSpan={8} className="px-5 py-4">
+                              <PricingBreakdown product={p} costNetCaisse={caisseValue} />
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -122,6 +155,44 @@ export default function ProductsPage() {
   )
 }
 
+function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; costNetCaisse: number | null }) {
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <Step
+        label="Prix de vente consommateur (PDS)"
+        value={fmtCAD(p.consumer_price)}
+        sub="Affiché en magasin"
+      />
+      <Step
+        label={`Moins marge magasin ${fmtPct(p.store_margin_pct)}`}
+        value={fmtCAD(p.price_direct)}
+        sub="= Prix coûtant magasin (ce que paie un STORE)"
+      />
+      <Step
+        label="Moins distribution (par défaut 18%)"
+        value={fmtCAD(p.price_broker)}
+        sub="= Cost net distributeur (ce que reçoit Chika via BROKER)"
+        highlight
+      />
+      <Step
+        label={`Par caisse (× ${p.units_per_box} unités)`}
+        value={fmtCAD(costNetCaisse)}
+        sub="Prix d'une caisse en circuit courtier"
+      />
+    </div>
+  )
+}
+
+function Step({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
+  return (
+    <div className={`bg-white rounded-lg p-3 ring-1 ${highlight ? 'ring-chika-paprika/40' : 'ring-stone-200'}`}>
+      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{label}</div>
+      <div className={`text-xl font-bold tabular-nums mt-1 ${highlight ? 'text-chika-paprika' : 'text-stone-900'}`}>{value}</div>
+      <div className="text-[10px] text-stone-500 mt-1">{sub}</div>
+    </div>
+  )
+}
+
 function ProductForm({ initial, onClose, onSaved }: {
   initial: Product | null; onClose: () => void; onSaved: () => void
 }) {
@@ -129,25 +200,41 @@ function ProductForm({ initial, onClose, onSaved }: {
   const isEdit = !!initial
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: initial
       ? {
           name: initial.name, sku: initial.sku, units_per_box: initial.units_per_box,
-          unit_cost: initial.unit_cost as number ?? '', price_broker: initial.price_broker as number ?? '',
-          price_direct: initial.price_direct as number ?? '', currency: initial.currency,
-          active: initial.active, image_url: initial.image_url ?? '',
+          unit_cost: initial.unit_cost as number ?? '',
+          consumer_price: initial.consumer_price as number ?? '',
+          store_margin_pct: initial.store_margin_pct as number ?? '',
+          price_broker: initial.price_broker as number ?? '',
+          price_direct: initial.price_direct as number ?? '',
+          currency: initial.currency, active: initial.active, image_url: initial.image_url ?? '',
         }
-      : { currency: 'CAD', active: true, units_per_box: 12 },
+      : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35 },
   })
+
+  // Auto-derive direct + broker prices from consumer_price + store_margin_pct
+  const consumer = num(watch('consumer_price'))
+  const margin = num(watch('store_margin_pct'))
+  const direct = consumer !== null && margin !== null ? +(consumer * (1 - margin)).toFixed(2) : null
+  const broker = direct !== null ? +(direct * (1 - 0.18)).toFixed(2) : null
+
+  function applyDerived() {
+    if (direct !== null) setValue('price_direct', direct)
+    if (broker !== null) setValue('price_broker', broker)
+  }
 
   const mut = useMutation({
     mutationFn: async (v: FormData) => {
       const payload: ProductPayload = {
         name: v.name, sku: v.sku, units_per_box: Number(v.units_per_box),
-        unit_cost: v.unit_cost === '' ? null : Number(v.unit_cost),
-        price_broker: v.price_broker === '' ? null : Number(v.price_broker),
-        price_direct: v.price_direct === '' ? null : Number(v.price_direct),
+        unit_cost:        v.unit_cost === '' ? null : Number(v.unit_cost),
+        consumer_price:   v.consumer_price === '' ? null : Number(v.consumer_price),
+        store_margin_pct: v.store_margin_pct === '' ? null : Number(v.store_margin_pct),
+        price_broker:     v.price_broker === '' ? null : Number(v.price_broker),
+        price_direct:     v.price_direct === '' ? null : Number(v.price_direct),
         currency: v.currency, active: v.active,
         image_url: v.image_url || null,
       }
@@ -177,7 +264,7 @@ function ProductForm({ initial, onClose, onSaved }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form onClick={e => e.stopPropagation()}
         onSubmit={handleSubmit(v => mut.mutate(v))}
-        className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier le produit' : 'Nouveau produit'}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
@@ -187,37 +274,62 @@ function ProductForm({ initial, onClose, onSaved }: {
           <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>
         )}
 
-        <Field label="Nom" error={errors.name?.message}>
-          <input {...register('name')} className={inputCls} />
-        </Field>
-        <Field label="SKU" error={errors.sku?.message}>
-          <input {...register('sku')} className={`${inputCls} font-mono uppercase`} />
-        </Field>
-        <Field label="Unités par boîte" error={errors.units_per_box?.message}>
-          <input type="number" min="1" {...register('units_per_box')} className={inputCls} />
-        </Field>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Coût unitaire">
-            <input type="number" step="0.01" {...register('unit_cost')} className={inputCls} placeholder="0.00" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nom" error={errors.name?.message}>
+            <input {...register('name')} className={inputCls} />
           </Field>
-          <Field label="Prix courtier">
-            <input type="number" step="0.01" {...register('price_broker')} className={inputCls} placeholder="0.00" />
-          </Field>
-          <Field label="Prix direct">
-            <input type="number" step="0.01" {...register('price_direct')} className={inputCls} placeholder="0.00" />
+          <Field label="SKU" error={errors.sku?.message}>
+            <input {...register('sku')} className={`${inputCls} font-mono uppercase`} />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Unités par caisse" error={errors.units_per_box?.message}>
+            <input type="number" min="1" {...register('units_per_box')} className={inputCls} />
+          </Field>
+          <Field label="Coût unitaire (production)">
+            <input type="number" step="0.01" {...register('unit_cost')} className={inputCls} placeholder="0.00" />
+          </Field>
           <Field label="Devise">
             <select {...register('currency')} className={inputCls}>
               <option value="CAD">CAD</option>
               <option value="USD">USD</option>
             </select>
           </Field>
-          <Field label="Image (URL)">
-            <input {...register('image_url')} className={inputCls} placeholder="/brand/..." />
-          </Field>
         </div>
+
+        <div className="bg-chika-creamSoft/50 ring-1 ring-chika-cream rounded-lg p-4 space-y-3">
+          <div className="text-xs font-semibold text-chika-brown uppercase tracking-wider">Structure de prix</div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="PDS — Prix consommateur" error={errors.consumer_price?.message}>
+              <input type="number" step="0.01" {...register('consumer_price')} className={inputCls} placeholder="9.99" />
+            </Field>
+            <Field label="Marge magasin (fraction)" error={errors.store_margin_pct?.message}>
+              <input type="number" step="0.01" min="0" max="1" {...register('store_margin_pct')} className={inputCls} placeholder="0.35" />
+            </Field>
+          </div>
+          <div className="text-xs text-chika-brown flex items-center justify-between gap-2">
+            <span>
+              Auto-calculé : prix magasin <strong className="tabular-nums text-stone-900">{direct !== null ? fmtCAD(direct) : '—'}</strong>
+              {' · '}cost net (18%) <strong className="tabular-nums text-chika-paprika">{broker !== null ? fmtCAD(broker) : '—'}</strong>
+            </span>
+            <Button type="button" variant="secondary" size="sm" onClick={applyDerived}>
+              Appliquer
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Prix direct magasin (CAD)">
+              <input type="number" step="0.01" {...register('price_direct')} className={inputCls} placeholder="6.49" />
+            </Field>
+            <Field label="Prix courtier net (CAD)">
+              <input type="number" step="0.01" {...register('price_broker')} className={inputCls} placeholder="5.32" />
+            </Field>
+          </div>
+        </div>
+
+        <Field label="Image (URL)">
+          <input {...register('image_url')} className={inputCls} placeholder="/brand/..." />
+        </Field>
+
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" {...register('active')} className="accent-chika-paprika" />
           <span>Produit actif</span>

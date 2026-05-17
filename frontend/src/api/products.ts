@@ -6,6 +6,8 @@ export interface Product {
   sku: string
   units_per_box: number
   unit_cost: number | string | null
+  consumer_price: number | string | null
+  store_margin_pct: number | string | null
   price_broker: number | string | null
   price_direct: number | string | null
   currency: string
@@ -20,6 +22,8 @@ export interface ProductPayload {
   sku: string
   units_per_box: number
   unit_cost?: number | null
+  consumer_price?: number | null
+  store_margin_pct?: number | null
   price_broker?: number | null
   price_direct?: number | null
   currency?: string
