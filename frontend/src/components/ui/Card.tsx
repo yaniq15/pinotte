@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 /** Shopify-style card: white bg, soft ring (no harsh border), subtle shadow. */
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {

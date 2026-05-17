@@ -132,7 +132,7 @@ function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const today = new Date().toISOString().slice(0, 10)
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as never,
     defaultValues: { movement_type: 'LOSS', movement_date: today, quantity_boxes: -1 },
   })
 

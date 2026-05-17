@@ -6,7 +6,7 @@ from ...core.database import get_db
 from ...crud import product as crud
 from ...models.user import User
 from ...schemas.product import ProductCreate, ProductRead, ProductUpdate
-from ..deps import get_current_user
+from ..deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -66,7 +66,7 @@ def update_product(
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(
     product_id: int,
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("OWNER")),
     db: Session = Depends(get_db),
 ) -> None:
     product = crud.get_by_id(db, product_id)

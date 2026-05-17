@@ -134,7 +134,7 @@ function ClientForm({ initial, onClose, onSaved }: {
   const isEdit = !!initial
   const [serverError, setServerError] = useState<string | null>(null)
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as never,
     defaultValues: initial
       ? {
           name: initial.name, type: initial.type,

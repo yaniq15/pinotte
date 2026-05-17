@@ -172,7 +172,7 @@ function ExpenseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const today = new Date().toISOString().slice(0, 10)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as never,
     defaultValues: { expense_date: today, amount: 0 },
   })
 

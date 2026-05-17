@@ -1,4 +1,4 @@
-"""FastAPI dependencies — DB session + auth (current user)."""
+"""FastAPI dependencies — DB session + auth (current user) + role check."""
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -28,3 +28,17 @@ def get_current_user(
     if not user or not user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable ou désactivé")
     return user
+
+
+def require_roles(*allowed: str):
+    """Dependency factory — restrict an endpoint to specific roles.
+    Usage: ``Depends(require_roles("OWNER"))``."""
+    allowed_set = set(allowed)
+    def _dep(current: User = Depends(get_current_user)) -> User:
+        if current.role not in allowed_set:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Rôle requis : {', '.join(sorted(allowed_set))} (tu as : {current.role})",
+            )
+        return current
+    return _dep

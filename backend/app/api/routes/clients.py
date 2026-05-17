@@ -8,7 +8,7 @@ from ...core.database import get_db
 from ...crud import client as crud
 from ...models.user import User
 from ...schemas.client import ClientCreate, ClientRead, ClientUpdate
-from ..deps import get_current_user
+from ..deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -60,7 +60,7 @@ def update_client(
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_client(
     client_id: int,
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("OWNER")),
     db: Session = Depends(get_db),
 ) -> None:
     client = crud.get_by_id(db, client_id)

@@ -10,6 +10,7 @@ export interface Client {
   phone: string | null
   address: string | null
   payment_terms_days: number
+  distribution_rate_pct: number | string | null
   active: boolean
   created_at: string
   updated_at: string
@@ -22,6 +23,7 @@ export interface ClientPayload {
   phone?: string | null
   address?: string | null
   payment_terms_days?: number
+  distribution_rate_pct?: number | null
   active?: boolean
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -14,18 +14,25 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 
+// Preprocess: convert empty strings (from <input>) to undefined so .optional() works cleanly.
+const optNum = (max?: number) => {
+  let n = z.coerce.number().min(0)
+  if (max !== undefined) n = n.max(max)
+  return z.preprocess((v) => (v === '' || v === null ? undefined : v), n.optional())
+}
+
 const schema = z.object({
   name: z.string().min(1, 'Requis'),
   sku: z.string().min(1, 'Requis'),
   units_per_box: z.coerce.number().int().positive('> 0 requis'),
-  unit_cost: z.coerce.number().min(0).optional().or(z.literal('')),
-  consumer_price: z.coerce.number().min(0).optional().or(z.literal('')),
-  store_margin_pct: z.coerce.number().min(0).max(1).optional().or(z.literal('')),
-  price_broker: z.coerce.number().min(0).optional().or(z.literal('')),
-  price_direct: z.coerce.number().min(0).optional().or(z.literal('')),
+  unit_cost: optNum(),
+  consumer_price: optNum(),
+  store_margin_pct: optNum(1),
+  price_broker: optNum(),
+  price_direct: optNum(),
   currency: z.string().length(3).default('CAD'),
   active: z.boolean().default(true),
-  image_url: z.string().optional().or(z.literal('')),
+  image_url: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -92,8 +99,8 @@ export default function ProductsPage() {
                     const costNet = num(p.price_broker)
                     const caisseValue = costNet !== null ? costNet * upb : null
                     return (
-                      <>
-                        <tr key={p.id} className={`border-t border-stone-100 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
+                      <Fragment key={p.id}>
+                        <tr className={`border-t border-stone-100 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
                           <td className="px-5 py-3">
                             <button onClick={() => setExpanded(isOpen ? null : p.id)}
                               className="text-stone-400 hover:text-stone-700">
@@ -132,7 +139,7 @@ export default function ProductsPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -201,15 +208,16 @@ function ProductForm({ initial, onClose, onSaved }: {
   const [serverError, setServerError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    // z.coerce.number infers input as `unknown`; cast keeps RHF happy.
+    resolver: zodResolver(schema) as never,
     defaultValues: initial
       ? {
           name: initial.name, sku: initial.sku, units_per_box: initial.units_per_box,
-          unit_cost: initial.unit_cost as number ?? '',
-          consumer_price: initial.consumer_price as number ?? '',
-          store_margin_pct: initial.store_margin_pct as number ?? '',
-          price_broker: initial.price_broker as number ?? '',
-          price_direct: initial.price_direct as number ?? '',
+          unit_cost: initial.unit_cost == null ? undefined : Number(initial.unit_cost),
+          consumer_price: initial.consumer_price == null ? undefined : Number(initial.consumer_price),
+          store_margin_pct: initial.store_margin_pct == null ? undefined : Number(initial.store_margin_pct),
+          price_broker: initial.price_broker == null ? undefined : Number(initial.price_broker),
+          price_direct: initial.price_direct == null ? undefined : Number(initial.price_direct),
           currency: initial.currency, active: initial.active, image_url: initial.image_url ?? '',
         }
       : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35 },
@@ -230,11 +238,11 @@ function ProductForm({ initial, onClose, onSaved }: {
     mutationFn: async (v: FormData) => {
       const payload: ProductPayload = {
         name: v.name, sku: v.sku, units_per_box: Number(v.units_per_box),
-        unit_cost:        v.unit_cost === '' ? null : Number(v.unit_cost),
-        consumer_price:   v.consumer_price === '' ? null : Number(v.consumer_price),
-        store_margin_pct: v.store_margin_pct === '' ? null : Number(v.store_margin_pct),
-        price_broker:     v.price_broker === '' ? null : Number(v.price_broker),
-        price_direct:     v.price_direct === '' ? null : Number(v.price_direct),
+        unit_cost:        v.unit_cost ?? null,
+        consumer_price:   v.consumer_price ?? null,
+        store_margin_pct: v.store_margin_pct ?? null,
+        price_broker:     v.price_broker ?? null,
+        price_direct:     v.price_direct ?? null,
         currency: v.currency, active: v.active,
         image_url: v.image_url || null,
       }

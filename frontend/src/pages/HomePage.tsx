@@ -88,7 +88,7 @@ export default function HomePage() {
                       <BarChart data={report.sales_by_product}>
                         <XAxis dataKey="product_sku" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtCAD(v)} width={70} />
-                        <Tooltip formatter={(v: number) => fmtCADfull(v)} />
+                        <Tooltip formatter={(v) => fmtCADfull(Number(v))} />
                         <Bar dataKey="revenue" fill="#C5532E" radius={[8, 8, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -110,7 +110,7 @@ export default function HomePage() {
                             <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => fmtCADfull(v)} />
+                        <Tooltip formatter={(v) => fmtCADfull(Number(v))} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>

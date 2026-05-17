@@ -11,6 +11,7 @@ import ClientsPage from './pages/ClientsPage'
 import SalesPage from './pages/SalesPage'
 import ExpensesPage from './pages/ExpensesPage'
 import CalculatorPage from './pages/CalculatorPage'
+import SettingsPage from './pages/SettingsPage'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AppLayout from './components/shared/AppLayout'
 
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="/ventes" element={<SalesPage />} />
               <Route path="/depenses" element={<ExpensesPage />} />
               <Route path="/calculateur" element={<CalculatorPage />} />
+              <Route path="/profil" element={<SettingsPage />} />
             </Route>
           </Route>
 
