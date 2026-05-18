@@ -5,9 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, X, ChevronRight } from 'lucide-react'
 import {
-  listProducts, createProduct, updateProduct, deleteProduct,
+  listProducts, createProduct, updateProduct, deleteProduct, uploadProductImage,
   type Product, type ProductPayload,
 } from '../api/products'
+import { resolveImageUrl } from '../lib/axios'
 import { PageHeader } from '../components/shared/AppLayout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -33,6 +34,7 @@ const schema = z.object({
   currency: z.string().length(3).default('CAD'),
   active: z.boolean().default(true),
   image_url: z.string().optional(),
+  taxable: z.boolean().default(false),
 })
 
 type FormData = z.infer<typeof schema>
@@ -110,7 +112,7 @@ export default function ProductsPage() {
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
                               {p.image_url && (
-                                <img src={p.image_url} alt={p.name}
+                                <img src={resolveImageUrl(p.image_url) ?? ''} alt={p.name}
                                      className="w-10 h-10 object-contain rounded-md bg-stone-50 ring-1 ring-stone-100 shrink-0" />
                               )}
                               <span className="font-medium text-stone-900">{p.name}</span>
@@ -119,8 +121,14 @@ export default function ProductsPage() {
                           <td className="px-5 py-3 font-mono text-xs text-stone-500 hidden sm:table-cell">{p.sku}</td>
                           <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-600">{upb}</td>
                           <td className="px-5 py-3 text-right tabular-nums font-semibold text-chika-paprika">{fmtCAD(p.consumer_price)}</td>
-                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700">{fmtCAD(p.price_direct)}</td>
-                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-900 font-semibold">{fmtCAD(p.price_broker)}</td>
+                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700">
+                            <div>{fmtCAD(p.price_direct)}<span className="text-stone-400 text-[10px] ml-0.5">/u</span></div>
+                            <div className="text-[10px] text-stone-500">{fmtCAD(num(p.price_direct) !== null ? Number(p.price_direct) * upb : null)}/caisse</div>
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-900">
+                            <div className="font-semibold">{fmtCAD(p.price_broker)}<span className="text-stone-400 text-[10px] ml-0.5 font-normal">/u</span></div>
+                            <div className="text-[10px] text-stone-500 font-normal">{fmtCAD(caisseValue)}/caisse</div>
+                          </td>
                           <td className="px-5 py-3 text-center">
                             {p.active ? <Badge tone="success">Actif</Badge> : <Badge tone="neutral">Inactif</Badge>}
                           </td>
@@ -163,6 +171,10 @@ export default function ProductsPage() {
 }
 
 function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; costNetCaisse: number | null }) {
+  // Calcule la vraie commission courtier appliquée à partir des prix stockés
+  const brokerPctReal = (p.price_direct && p.price_broker && p.price_direct > 0)
+    ? Math.round((1 - Number(p.price_broker) / Number(p.price_direct)) * 100)
+    : null
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
       <Step
@@ -176,7 +188,7 @@ function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; cos
         sub="= Prix coûtant magasin (ce que paie un STORE)"
       />
       <Step
-        label="Moins distribution (par défaut 18%)"
+        label={`Moins distribution${brokerPctReal !== null ? ` ${brokerPctReal}%` : ''}`}
         value={fmtCAD(p.price_broker)}
         sub="= Cost net distributeur (ce que reçoit Chika via BROKER)"
         highlight
@@ -219,15 +231,42 @@ function ProductForm({ initial, onClose, onSaved }: {
           price_broker: initial.price_broker == null ? undefined : Number(initial.price_broker),
           price_direct: initial.price_direct == null ? undefined : Number(initial.price_direct),
           currency: initial.currency, active: initial.active, image_url: initial.image_url ?? '',
+          taxable: initial.taxable ?? false,
         }
-      : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35 },
+      : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35, taxable: false },
   })
 
   // Auto-derive direct + broker prices from consumer_price + store_margin_pct
+  // Commission courtier ajustable (par défaut 18%, mais varie selon le contrat)
+  const [brokerCommission, setBrokerCommission] = useState<number>(0.18)
+
+  // Image : choix entre URL externe ou upload fichier local
+  const [imageMode, setImageMode] = useState<'url' | 'upload'>(
+    initial?.image_url?.startsWith('/uploads/') ? 'upload' : 'url'
+  )
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initial?.image_url ?? null)
+
+  function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (!['image/jpeg','image/png','image/webp','image/gif'].includes(f.type)) {
+      setServerError('Type de fichier non supporté (jpeg/png/webp/gif uniquement)')
+      return
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setServerError('Image trop volumineuse (max 5 MB)')
+      return
+    }
+    setPendingFile(f)
+    setPreviewUrl(URL.createObjectURL(f))
+    setServerError(null)
+  }
   const consumer = num(watch('consumer_price'))
   const margin = num(watch('store_margin_pct'))
   const direct = consumer !== null && margin !== null ? +(consumer * (1 - margin)).toFixed(2) : null
-  const broker = direct !== null ? +(direct * (1 - 0.18)).toFixed(2) : null
+  const broker = direct !== null ? +(direct * (1 - brokerCommission)).toFixed(2) : null
+  const brokerPct = Math.round(brokerCommission * 100)
 
   function applyDerived() {
     if (direct !== null) setValue('price_direct', direct)
@@ -243,10 +282,18 @@ function ProductForm({ initial, onClose, onSaved }: {
         store_margin_pct: v.store_margin_pct ?? null,
         price_broker:     v.price_broker ?? null,
         price_direct:     v.price_direct ?? null,
-        currency: v.currency, active: v.active,
-        image_url: v.image_url || null,
+        currency: v.currency, active: v.active, taxable: v.taxable,
+        // En mode upload, l'URL sera set par l'endpoint upload après création
+        image_url: imageMode === 'url' ? (v.image_url || null) : (initial?.image_url ?? null),
       }
-      return isEdit ? updateProduct(initial!.id, payload) : createProduct(payload)
+      const product = isEdit
+        ? await updateProduct(initial!.id, payload)
+        : await createProduct(payload)
+      // Si un fichier est en attente, l'uploader maintenant (set image_url)
+      if (imageMode === 'upload' && pendingFile) {
+        return await uploadProductImage(product.id, pendingFile)
+      }
+      return product
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); onSaved() },
     onError: (err: unknown) => {
@@ -307,18 +354,24 @@ function ProductForm({ initial, onClose, onSaved }: {
 
         <div className="bg-chika-creamSoft/50 ring-1 ring-chika-cream rounded-lg p-4 space-y-3">
           <div className="text-xs font-semibold text-chika-brown uppercase tracking-wider">Structure de prix</div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="PDS — Prix consommateur" error={errors.consumer_price?.message}>
               <input type="number" step="0.01" {...register('consumer_price')} className={inputCls} placeholder="9.99" />
             </Field>
             <Field label="Marge magasin (fraction)" error={errors.store_margin_pct?.message}>
               <input type="number" step="0.01" min="0" max="1" {...register('store_margin_pct')} className={inputCls} placeholder="0.35" />
             </Field>
+            <Field label="Commission courtier (fraction)">
+              <input type="number" step="0.01" min="0" max="1"
+                value={brokerCommission}
+                onChange={e => setBrokerCommission(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
+                className={inputCls} placeholder="0.18" />
+            </Field>
           </div>
           <div className="text-xs text-chika-brown flex items-center justify-between gap-2">
             <span>
               Auto-calculé : prix magasin <strong className="tabular-nums text-stone-900">{direct !== null ? fmtCAD(direct) : '—'}</strong>
-              {' · '}cost net (18%) <strong className="tabular-nums text-chika-paprika">{broker !== null ? fmtCAD(broker) : '—'}</strong>
+              {' · '}cost net ({brokerPct}%) <strong className="tabular-nums text-chika-paprika">{broker !== null ? fmtCAD(broker) : '—'}</strong>
             </span>
             <Button type="button" variant="secondary" size="sm" onClick={applyDerived}>
               Appliquer
@@ -334,14 +387,67 @@ function ProductForm({ initial, onClose, onSaved }: {
           </div>
         </div>
 
-        <Field label="Image (URL)">
-          <input {...register('image_url')} className={inputCls} placeholder="/brand/..." />
-        </Field>
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-stone-600 uppercase tracking-wider">Image du produit</div>
+          <div className="flex gap-1.5">
+            <button type="button" onClick={() => setImageMode('url')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${imageMode === 'url' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
+              🔗 URL externe
+            </button>
+            <button type="button" onClick={() => setImageMode('upload')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${imageMode === 'upload' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
+              📁 Upload depuis PC
+            </button>
+          </div>
 
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" {...register('active')} className="accent-chika-paprika" />
-          <span>Produit actif</span>
-        </label>
+          {imageMode === 'url' ? (
+            <Field label="URL de l'image">
+              <input {...register('image_url')} className={inputCls}
+                placeholder="https://... ou /brand/..."
+                onChange={(e) => setPreviewUrl(e.target.value || null)} />
+            </Field>
+          ) : (
+            <div className="space-y-2">
+              <Field label="Choisir un fichier (jpeg/png/webp/gif, max 5 MB)">
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={onFileSelected}
+                  className={`${inputCls} file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 file:text-xs file:font-semibold`} />
+              </Field>
+              {pendingFile && (
+                <div className="text-[11px] text-stone-500">
+                  📎 {pendingFile.name} · {(pendingFile.size / 1024).toFixed(0)} KB · sera uploadé à la sauvegarde
+                </div>
+              )}
+            </div>
+          )}
+
+          {previewUrl && (
+            <div className="mt-2 p-2 bg-stone-50 rounded-lg ring-1 ring-stone-200 flex items-center gap-3">
+              <img src={previewUrl.startsWith('blob:') ? previewUrl : (resolveImageUrl(previewUrl) ?? previewUrl)}
+                alt="Aperçu" className="w-16 h-16 object-cover rounded"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <div className="text-[11px] text-stone-500 truncate flex-1">
+                {previewUrl.startsWith('blob:') ? 'Aperçu local (avant upload)' : previewUrl}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2 border-t border-stone-100 pt-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" {...register('active')} className="accent-chika-paprika" />
+            <span>Produit actif</span>
+          </label>
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input type="checkbox" {...register('taxable')} className="accent-chika-paprika mt-0.5" />
+            <span>
+              Soumis aux taxes (TPS + TVQ)
+              <span className="block text-[10px] text-stone-500 mt-0.5">
+                ⚠️ Au Québec, l'épicerie de base est <strong>détaxée</strong> (légumes, viande, sauces alimentaires). Coche seulement si ce produit est taxable (ex: cadeaux, marketing, produits non alimentaires).
+              </span>
+            </span>
+          </label>
+        </div>
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-100">
           {isEdit && (

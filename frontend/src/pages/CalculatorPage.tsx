@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Save, Calculator, CheckCircle2 } from 'lucide-react'
 import { listProducts } from '../api/products'
 import { getRecipe, putRecipe, applyCost, type RecipeIngredient } from '../api/recipes'
+import { listMaterials, type Material } from '../api/materials'
 import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -22,11 +23,39 @@ const fmtCADprecise = (v: number | null | undefined) => {
 export default function CalculatorPage() {
   const qc = useQueryClient()
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
+  const materials = useQuery({ queryKey: ['materials'], queryFn: () => listMaterials() })
 
   const [productId, setProductId] = useState<string>('')
   const [batchYield, setBatchYield] = useState<string>('')
   const [lines, setLines] = useState<RecipeIngredient[]>([])
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Helper "calcul auto du rendement" — masse totale / masse unitaire − pertes
+  const [yieldMode, setYieldMode] = useState<'direct' | 'auto'>('direct')
+  const [batchMassG, setBatchMassG] = useState<string>('')   // masse totale du batch en grammes
+  const [unitMassG, setUnitMassG] = useState<string>('')     // masse d'un sac en grammes
+  const [lossPct, setLossPct] = useState<string>('0')        // pertes en %
+
+  // Coûts additionnels par sac (emballage + main d'œuvre) — persistés dans la
+  // recette comme des lignes spéciales préfixées [Auto] pour les retirer de
+  // l'affichage normal des ingrédients.
+  const PACKAGING_TAG = '[Auto] Sac sous vide / emballage'
+  const LABOR_TAG = '[Auto] Main d\'œuvre'
+  const [packagingPerUnit, setPackagingPerUnit] = useState<string>('0')
+  const [laborPerUnit, setLaborPerUnit] = useState<string>('2.50')
+
+  const yieldTheoretical = (Number(batchMassG) > 0 && Number(unitMassG) > 0)
+    ? Math.floor(Number(batchMassG) / Number(unitMassG))
+    : null
+  const yieldEffective = yieldTheoretical !== null
+    ? Math.floor(yieldTheoretical * (1 - (Number(lossPct) || 0) / 100))
+    : null
+
+  function applyAutoYield() {
+    if (yieldEffective !== null && yieldEffective > 0) {
+      setBatchYield(String(yieldEffective))
+    }
+  }
 
   const selectedProduct = products.data?.find(p => p.id === Number(productId))
   const unitsPerBox = selectedProduct?.units_per_box ?? 0
@@ -41,8 +70,16 @@ export default function CalculatorPage() {
   useEffect(() => {
     if (recipe.data) {
       setBatchYield(recipe.data.batch_yield_units?.toString() ?? '')
-      setLines(recipe.data.ingredients.length
-        ? recipe.data.ingredients.map(i => ({
+      const allIngs = recipe.data.ingredients
+      // Détecter les lignes [Auto] et pré-remplir les states correspondants
+      const pkgLine = allIngs.find(i => i.name === PACKAGING_TAG)
+      const lbrLine = allIngs.find(i => i.name === LABOR_TAG)
+      if (pkgLine?.unit_price != null) setPackagingPerUnit(String(pkgLine.unit_price))
+      if (lbrLine?.unit_price != null) setLaborPerUnit(String(lbrLine.unit_price))
+      // N'afficher dans la liste recette QUE les vrais ingrédients
+      const realIngs = allIngs.filter(i => i.name !== PACKAGING_TAG && i.name !== LABOR_TAG)
+      setLines(realIngs.length
+        ? realIngs.map(i => ({
             name: i.name, unit: i.unit, quantity: i.quantity, unit_price: i.unit_price,
             notes: i.notes, sort_order: i.sort_order,
           }))
@@ -71,24 +108,49 @@ export default function CalculatorPage() {
   }))
   const totalBatch = linesWithCost.reduce((s, l) => s + (l.lineCost ?? 0), 0)
   const yieldNum = Number(batchYield) || 0
-  const costPerUnit = yieldNum > 0 ? totalBatch / yieldNum : null
+  const matPerUnit = yieldNum > 0 ? totalBatch / yieldNum : null
+  const pkgPerUnit = Number(packagingPerUnit) || 0
+  const lbrPerUnit = Number(laborPerUnit) || 0
+  // Coût total par unité = matières/u + emballage/u + main d'œuvre/u
+  const costPerUnit = matPerUnit !== null ? matPerUnit + pkgPerUnit + lbrPerUnit : null
   const costPerBox = costPerUnit !== null ? costPerUnit * unitsPerBox : null
+
+  // Construit la liste d'ingrédients à envoyer en BDD = vrais ingrédients +
+  // 2 lignes [Auto] pour emballage et main d'œuvre (chacune représentant
+  // pkg×yield et lbr×yield, qui divisés par yield redonnent le bon coût/u).
+  function buildIngredientsPayload() {
+    const real = lines
+      .filter(l => l.name.trim())
+      .map((l, i) => ({
+        name: l.name.trim(),
+        unit: l.unit,
+        quantity: Number(l.quantity) || 0,
+        unit_price: l.unit_price === null || l.unit_price === undefined || l.unit_price === ('' as unknown as number) ? null : Number(l.unit_price),
+        notes: l.notes || null,
+        sort_order: i,
+      }))
+    const autos: typeof real = []
+    if (pkgPerUnit > 0 && yieldNum > 0) {
+      autos.push({
+        name: PACKAGING_TAG, unit: 'u', quantity: yieldNum,
+        unit_price: pkgPerUnit, notes: null, sort_order: 1000,
+      })
+    }
+    if (lbrPerUnit > 0 && yieldNum > 0) {
+      autos.push({
+        name: LABOR_TAG, unit: 'u', quantity: yieldNum,
+        unit_price: lbrPerUnit, notes: null, sort_order: 1001,
+      })
+    }
+    return [...real, ...autos]
+  }
 
   const saveMut = useMutation({
     mutationFn: async () => {
       if (!productId) throw new Error('Produit requis')
       return putRecipe(Number(productId), {
         batch_yield_units: yieldNum > 0 ? yieldNum : null,
-        ingredients: lines
-          .filter(l => l.name.trim())
-          .map((l, i) => ({
-            name: l.name.trim(),
-            unit: l.unit,
-            quantity: Number(l.quantity) || 0,
-            unit_price: l.unit_price === null || l.unit_price === undefined || l.unit_price === ('' as unknown as number) ? null : Number(l.unit_price),
-            notes: l.notes || null,
-            sort_order: i,
-          })),
+        ingredients: buildIngredientsPayload(),
       })
     },
     onSuccess: () => {
@@ -99,11 +161,20 @@ export default function CalculatorPage() {
   })
 
   const applyMut = useMutation({
-    mutationFn: async () => applyCost(Number(productId)),
+    mutationFn: async () => {
+      if (!productId) throw new Error('Produit requis')
+      // Sauve d'abord la recette en BDD pour s'assurer que les modifs locales
+      // (rendement + ingrédients + coûts auto) sont prises en compte, PUIS applique le coût.
+      await putRecipe(Number(productId), {
+        batch_yield_units: yieldNum > 0 ? yieldNum : null,
+        ingredients: buildIngredientsPayload(),
+      })
+      return applyCost(Number(productId))
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipe', productId] })
       qc.invalidateQueries({ queryKey: ['products'] })
-      setSuccess('Coût unitaire mis à jour sur le produit ✓')
+      setSuccess('Recette enregistrée et coût unitaire mis à jour ✓')
       setTimeout(() => setSuccess(null), 3000)
     },
     onError: (err: unknown) => {
@@ -118,6 +189,12 @@ export default function CalculatorPage() {
 
   return (
     <div className="px-6 lg:px-10 py-8 max-w-7xl">
+      {/* Datalist global pour l'autocomplete depuis le catalogue Matières */}
+      <datalist id="materials-catalog">
+        {materials.data?.map(m => (
+          <option key={m.id} value={m.name}>{m.unit} · {Number(m.weighted_avg_price).toFixed(2)} $/{m.unit}</option>
+        ))}
+      </datalist>
       <PageHeader
         title="Calculateur de coût"
         description="Saisis la recette d'un produit → coût unitaire calculé automatiquement."
@@ -170,14 +247,91 @@ export default function CalculatorPage() {
             <CardHeader title="Rendement d'un batch"
               subtitle="Combien d'unités produit UN batch (UN cycle de production complet) ?" />
             <CardBody>
-              <div className="flex items-center gap-3">
-                <input type="number" min="1" value={batchYield} onChange={e => setBatchYield(e.target.value)}
-                  className="px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm w-32 text-right tabular-nums"
-                  placeholder="ex: 8" />
-                <span className="text-sm text-stone-600">
-                  {selectedProduct?.name ? `bocaux / sacs de ${selectedProduct.name}` : 'unités par batch'}
-                </span>
+              {/* Toggle mode */}
+              <div className="flex gap-1.5 mb-3">
+                <button type="button" onClick={() => setYieldMode('direct')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${yieldMode === 'direct' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
+                  ✏️ Saisie directe
+                </button>
+                <button type="button" onClick={() => setYieldMode('auto')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${yieldMode === 'auto' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
+                  🧮 Calcul auto (masse × conditionnement)
+                </button>
               </div>
+
+              {yieldMode === 'direct' ? (
+                <div className="flex items-center gap-3">
+                  <input type="number" min="1" value={batchYield} onChange={e => setBatchYield(e.target.value)}
+                    className="px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm w-32 text-right tabular-nums"
+                    placeholder="ex: 23" />
+                  <span className="text-sm text-stone-600">
+                    {selectedProduct?.name ? `bocaux / sacs de ${selectedProduct.name}` : 'unités par batch'}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3 bg-chika-creamSoft/50 ring-1 ring-chika-cream rounded-lg p-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Masse totale du batch</label>
+                      <div className="flex items-center gap-1 mt-1">
+                        <input type="number" min="0" value={batchMassG} onChange={e => setBatchMassG(e.target.value)}
+                          className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
+                          placeholder="ex: 5600" />
+                        <span className="text-xs text-stone-500">g</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Masse / sac</label>
+                      <div className="flex items-center gap-1 mt-1">
+                        <input type="number" min="0" value={unitMassG} onChange={e => setUnitMassG(e.target.value)}
+                          className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
+                          placeholder="ex: 200" />
+                        <span className="text-xs text-stone-500">g</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Pertes / chutes</label>
+                      <div className="flex items-center gap-1 mt-1">
+                        <input type="number" min="0" max="100" step="1" value={lossPct} onChange={e => setLossPct(e.target.value)}
+                          className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
+                          placeholder="0" />
+                        <span className="text-xs text-stone-500">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {yieldTheoretical !== null && (
+                    <div className="text-xs text-stone-700 bg-white rounded-lg ring-1 ring-stone-200 p-3">
+                      <div className="flex justify-between items-center">
+                        <span>Rendement théorique <span className="text-stone-400">({batchMassG} g ÷ {unitMassG} g)</span></span>
+                        <strong className="tabular-nums">{yieldTheoretical} sacs</strong>
+                      </div>
+                      {Number(lossPct) > 0 && (
+                        <div className="flex justify-between items-center mt-1">
+                          <span>Moins pertes {lossPct} %</span>
+                          <span className="tabular-nums text-stone-500">−{yieldTheoretical - (yieldEffective ?? 0)} sacs</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-stone-100">
+                        <strong>Rendement effectif</strong>
+                        <strong className="tabular-nums text-chika-paprika text-base">{yieldEffective} sacs</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  <button type="button" onClick={applyAutoYield}
+                    disabled={!yieldEffective || yieldEffective <= 0}
+                    className="w-full py-2 rounded-lg text-sm font-semibold bg-chika-paprika text-white hover:bg-chika-paprika/90 disabled:opacity-40 disabled:cursor-not-allowed">
+                    Utiliser {yieldEffective ?? '—'} comme rendement
+                  </button>
+
+                  {batchYield && Number(batchYield) > 0 && (
+                    <div className="text-[11px] text-stone-500 italic">
+                      Rendement actuellement utilisé pour le calcul : <strong>{batchYield} sacs</strong>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardBody>
           </Card>
 
@@ -202,8 +356,23 @@ export default function CalculatorPage() {
                     {linesWithCost.map((l, i) => (
                       <tr key={i} className="border-t border-stone-100">
                         <td className="px-4 py-2">
-                          <input value={l.name} onChange={e => updateLine(i, { name: e.target.value })}
-                            className={inputCls} placeholder="Pâte d'arachide" />
+                          <input value={l.name}
+                            onChange={e => {
+                              const newName = e.target.value
+                              // Auto-fill depuis catalogue Matières si le nom match exactement
+                              const match: Material | undefined = materials.data?.find(m => m.name === newName)
+                              if (match) {
+                                updateLine(i, {
+                                  name: newName,
+                                  unit: match.unit,
+                                  unit_price: Number(match.weighted_avg_price),
+                                })
+                              } else {
+                                updateLine(i, { name: newName })
+                              }
+                            }}
+                            list="materials-catalog"
+                            className={inputCls} placeholder="Pâte d'arachide / sélectionne dans la liste" />
                         </td>
                         <td className="px-4 py-2">
                           <input type="number" step="0.0001" value={l.quantity}
@@ -258,6 +427,56 @@ export default function CalculatorPage() {
             </CardBody>
           </Card>
 
+          {/* Coûts additionnels par sac (emballage + main d'œuvre) */}
+          <Card className="mb-4">
+            <CardHeader title="Coûts additionnels par sac"
+              subtitle="Coûts hors matières premières, déjà PAR SAC produit. Ajoutés au coût matières/u." />
+            <CardBody>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Sac sous vide / emballage</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input type="number" step="0.01" min="0" value={packagingPerUnit}
+                      onChange={e => setPackagingPerUnit(e.target.value)}
+                      className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
+                      placeholder="0.00" />
+                    <span className="text-xs text-stone-500">$/sac</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Main d'œuvre</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input type="number" step="0.01" min="0" value={laborPerUnit}
+                      onChange={e => setLaborPerUnit(e.target.value)}
+                      className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
+                      placeholder="2.50" />
+                    <span className="text-xs text-stone-500">$/sac</span>
+                  </div>
+                </div>
+              </div>
+              {(pkgPerUnit > 0 || lbrPerUnit > 0) && yieldNum > 0 && (
+                <div className="mt-3 text-xs text-stone-600 bg-stone-50 rounded-lg p-3 space-y-1">
+                  {pkgPerUnit > 0 && (
+                    <div className="flex justify-between">
+                      <span>Emballage : {pkgPerUnit.toFixed(2)} $/sac × {yieldNum} sacs</span>
+                      <strong className="tabular-nums">{fmtCAD(pkgPerUnit * yieldNum)}</strong>
+                    </div>
+                  )}
+                  {lbrPerUnit > 0 && (
+                    <div className="flex justify-between">
+                      <span>Main d'œuvre : {lbrPerUnit.toFixed(2)} $/sac × {yieldNum} sacs</span>
+                      <strong className="tabular-nums">{fmtCAD(lbrPerUnit * yieldNum)}</strong>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1 mt-1 border-t border-stone-200">
+                    <strong>Total additionnel pour ce batch</strong>
+                    <strong className="tabular-nums text-chika-paprika">{fmtCAD((pkgPerUnit + lbrPerUnit) * yieldNum)}</strong>
+                  </div>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+
           {/* Result */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -265,8 +484,10 @@ export default function CalculatorPage() {
                 <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">Coût par unité</div>
                 <div className="text-3xl font-bold text-chika-paprika tabular-nums">{fmtCADprecise(costPerUnit)}</div>
                 {costPerUnit !== null && yieldNum > 0 && (
-                  <div className="text-[11px] text-stone-500 mt-1">
-                    {fmtCAD(totalBatch)} ÷ {yieldNum} unités
+                  <div className="text-[11px] text-stone-500 mt-1 space-y-0.5">
+                    <div>Matières : {fmtCADprecise(matPerUnit)} /u</div>
+                    {pkgPerUnit > 0 && <div>+ Emballage : {fmtCADprecise(pkgPerUnit)} /u</div>}
+                    {lbrPerUnit > 0 && <div>+ Main d'œuvre : {fmtCADprecise(lbrPerUnit)} /u</div>}
                   </div>
                 )}
               </CardBody>
@@ -289,10 +510,16 @@ export default function CalculatorPage() {
                 <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">vs coût actuel</div>
                 <div className="text-3xl font-bold text-stone-900 tabular-nums">
                   {currentUnitCost !== null ? fmtCAD(Number(currentUnitCost)) : '—'}
+                  <span className="text-[11px] font-normal text-stone-400 ml-1">/u</span>
                 </div>
+                {currentUnitCost !== null && unitsPerBox > 0 && (
+                  <div className="text-[11px] text-stone-500 mt-1">
+                    = {fmtCAD(Number(currentUnitCost) * unitsPerBox)} / caisse
+                  </div>
+                )}
                 {costDiff !== null && (
                   <Badge tone={costDiff > 0 ? 'warning' : costDiff < 0 ? 'success' : 'neutral'}>
-                    {costDiff > 0 ? '+' : ''}{fmtCADprecise(costDiff)}
+                    {costDiff > 0 ? '+' : ''}{fmtCADprecise(costDiff)} /u
                   </Badge>
                 )}
               </CardBody>

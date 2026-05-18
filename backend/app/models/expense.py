@@ -30,6 +30,8 @@ class Expense(Base, TimestampMixin):
     vendor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     receipt_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Qui a payé la dépense (champ libre : "Moi", "Yannick", "Marie", etc.)
+    paid_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     category = relationship("Category", lazy="joined")
     product = relationship("Product", lazy="joined")

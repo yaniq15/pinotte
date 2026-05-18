@@ -17,6 +17,7 @@ class ProductBase(BaseModel):
     currency: str = Field("CAD", min_length=3, max_length=3)
     active: bool = True
     image_url: Optional[str] = Field(None, max_length=500)
+    taxable: bool = Field(False, description="Si True, TPS/TVQ ajoutées à la vente. Default False (épicerie QC détaxée).")
 
 
 class ProductCreate(ProductBase):
@@ -35,6 +36,7 @@ class ProductUpdate(BaseModel):
     currency: Optional[str] = Field(None, min_length=3, max_length=3)
     active: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    taxable: Optional[bool] = None
 
 
 class ProductRead(ProductBase):

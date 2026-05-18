@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown,
+  LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/produits',   label: 'Produits',        icon: Package,        section: 'Catalogue' },
   { to: '/lots',       label: 'Lots',            icon: Boxes,          section: 'Catalogue' },
   { to: '/calculateur',label: 'Calculateur',     icon: Calculator,     section: 'Catalogue' },
+  { to: '/matieres',   label: 'Matières prem.',  icon: Sprout,         section: 'Catalogue' },
   { to: '/inventaire', label: 'Inventaire',      icon: Warehouse,      section: 'Catalogue' },
   { to: '/mouvements', label: 'Mouvements',      icon: ArrowLeftRight, section: 'Catalogue' },
   { to: '/clients',    label: 'Clients',         icon: Users,          section: 'Ventes' },

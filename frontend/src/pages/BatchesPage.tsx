@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -126,9 +126,9 @@ function BatchForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
   const [serverError, setServerError] = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
-    defaultValues: { production_date: today, quantity_boxes: 100, total_cost: 500 },
+    defaultValues: { production_date: today, quantity_boxes: 2, total_cost: 0 },
   })
 
   const productId = Number(watch('product_id') || 0)
@@ -138,6 +138,39 @@ function BatchForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
   const unitCost = selectedProduct && quantityBoxes > 0 && selectedProduct.units_per_box > 0
     ? totalCost / (quantityBoxes * selectedProduct.units_per_box)
     : 0
+
+  // Auto-remplit le coût total à partir du unit_cost du produit (issu de
+  // la recette/Calculator). L'user peut toujours overrider manuellement.
+  // Pour éviter d'écraser les changements de l'user, on garde une trace
+  // de la dernière auto-valeur calculée.
+  const [lastAutoCost, setLastAutoCost] = useState<number | null>(null)
+  useEffect(() => {
+    if (!selectedProduct || !selectedProduct.unit_cost || quantityBoxes <= 0) return
+    const upb = selectedProduct.units_per_box || 0
+    const productUnitCost = typeof selectedProduct.unit_cost === 'string'
+      ? parseFloat(selectedProduct.unit_cost)
+      : Number(selectedProduct.unit_cost)
+    if (!isFinite(productUnitCost) || productUnitCost <= 0) return
+    const autoTotal = +(productUnitCost * quantityBoxes * upb).toFixed(2)
+    // Override seulement si l'user n'a pas modifié manuellement
+    // (= la valeur actuelle correspond à la dernière auto-valeur OU est 0/défaut initial)
+    if (totalCost === 0 || totalCost === lastAutoCost) {
+      setValue('total_cost', autoTotal)
+      setLastAutoCost(autoTotal)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, quantityBoxes, selectedProduct?.unit_cost])
+
+  function resetToAuto() {
+    if (!selectedProduct || !selectedProduct.unit_cost) return
+    const upb = selectedProduct.units_per_box || 0
+    const productUnitCost = typeof selectedProduct.unit_cost === 'string'
+      ? parseFloat(selectedProduct.unit_cost)
+      : Number(selectedProduct.unit_cost)
+    const autoTotal = +(productUnitCost * quantityBoxes * upb).toFixed(2)
+    setValue('total_cost', autoTotal)
+    setLastAutoCost(autoTotal)
+  }
 
   const mut = useMutation({
     mutationFn: async (v: FormData) => {
@@ -197,9 +230,25 @@ function BatchForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
             <input type="number" min="1" {...register('quantity_boxes')} className={inputCls} />
           </Field>
           <Field label="Coût total (CAD)" error={errors.total_cost?.message}>
-            <input type="number" step="0.01" min="0" {...register('total_cost')} className={inputCls} />
+            <div className="flex items-center gap-1">
+              <input type="number" step="0.01" min="0" {...register('total_cost')} className={inputCls} />
+              {selectedProduct?.unit_cost && lastAutoCost !== null && Number(totalCost) !== lastAutoCost && (
+                <button type="button" onClick={resetToAuto} title="Restaurer le coût auto-calculé"
+                  className="px-2 py-1 text-[10px] rounded-md bg-stone-100 hover:bg-stone-200 text-stone-600 whitespace-nowrap">
+                  ↻ auto
+                </button>
+              )}
+            </div>
           </Field>
         </div>
+
+        {/* Auto-fill hint */}
+        {selectedProduct?.unit_cost && (
+          <div className="text-[11px] text-stone-500 italic -mt-2">
+            💡 Coût total pré-rempli à partir du coût unitaire du produit ({fmtCAD(Number(selectedProduct.unit_cost))}/sac × {selectedProduct.units_per_box} × {quantityBoxes} caisses).
+            Modifie librement si la réalité diffère de la recette.
+          </div>
+        )}
 
         {/* Computed unit cost preview */}
         <div className="bg-chika-creamSoft border border-chika-cream rounded-lg p-3 text-sm">
@@ -213,6 +262,11 @@ function BatchForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
             <span className="text-xs text-stone-500 ml-2">
               ({quantityBoxes} boîtes × {selectedProduct.units_per_box} unités)
             </span>
+          )}
+          {selectedProduct?.unit_cost && Math.abs(unitCost - Number(selectedProduct.unit_cost)) > 0.01 && (
+            <div className="text-[11px] text-amber-700 mt-1">
+              ⚠ Écart vs coût recette : {fmtCAD(unitCost - Number(selectedProduct.unit_cost))} / sac
+            </div>
           )}
         </div>
 

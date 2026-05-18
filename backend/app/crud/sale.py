@@ -31,7 +31,10 @@ def list_sales(
         stmt = stmt.where(Sale.sale_date >= date_from)
     if date_to:
         stmt = stmt.where(Sale.sale_date <= date_to)
-    return list(db.scalars(stmt).all())
+    # .unique() requis car Sale.items est en lazy="joined" : le SELECT joint
+    # sale_items (collection) et SQLAlchemy duplique les Sale parents — il faut
+    # dédupliquer explicitement.
+    return list(db.scalars(stmt).unique().all())
 
 
 def get_by_id(db: Session, sale_id: int) -> Optional[Sale]:

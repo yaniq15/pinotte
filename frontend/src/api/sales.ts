@@ -11,6 +11,7 @@ export interface SaleItem {
   subtotal: number | string
   product_name: string | null
   product_sku: string | null
+  product_taxable: boolean
 }
 
 export interface Sale {

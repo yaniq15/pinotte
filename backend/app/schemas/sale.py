@@ -24,6 +24,7 @@ class SaleItemRead(BaseModel):
     subtotal: Decimal
     product_name: Optional[str] = None
     product_sku: Optional[str] = None
+    product_taxable: bool = False  # remonté depuis Product pour calcul TPS/TVQ par ligne
 
 
 class SaleCreate(BaseModel):

@@ -44,6 +44,9 @@ class Product(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Au Québec, l'épicerie de base (légumes, viande, sauces alimentaires...)
+    # est DÉTAXÉE. taxable=False → pas de TPS/TVQ sur ce produit en vente.
+    taxable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
     ingredients = relationship(
         "ProductIngredient",

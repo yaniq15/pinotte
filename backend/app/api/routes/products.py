@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,6 +13,12 @@ from ...schemas.product import ProductCreate, ProductRead, ProductUpdate
 from ..deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+# Upload config
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads")) / "products"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+MAX_IMAGE_SIZE_MB = 5
 
 
 @router.get("", response_model=list[ProductRead])
@@ -80,3 +90,48 @@ def delete_product(
             status_code=409,
             detail="Produit lié à des lots — désactive-le plutôt que de le supprimer",
         )
+
+
+@router.post("/{product_id}/upload-image", response_model=ProductRead)
+async def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProductRead:
+    """Upload une image produit. Accepte jpeg/png/webp/gif, max 5 MB.
+    Le fichier est stocké dans uploads/products/{uuid}.{ext} et son URL
+    relative est sauvée dans product.image_url."""
+    product = crud.get_by_id(db, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Type de fichier non supporté. Autorisés : JPEG, PNG, WebP, GIF.",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image trop volumineuse (max {MAX_IMAGE_SIZE_MB} MB).",
+        )
+
+    # Determine extension from content_type
+    ext_map = {
+        "image/jpeg": "jpg", "image/png": "png",
+        "image/webp": "webp", "image/gif": "gif",
+    }
+    ext = ext_map[file.content_type]
+    filename = f"{product_id}-{uuid.uuid4().hex[:8]}.{ext}"
+    dest = UPLOAD_DIR / filename
+    dest.write_bytes(contents)
+
+    # URL relative servie par StaticFiles
+    image_url = f"/uploads/products/{filename}"
+
+    # Met à jour le produit
+    updated = crud.update(db, product, ProductUpdate(image_url=image_url))
+    return ProductRead.model_validate(updated)

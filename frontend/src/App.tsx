@@ -11,6 +11,7 @@ import ClientsPage from './pages/ClientsPage'
 import SalesPage from './pages/SalesPage'
 import ExpensesPage from './pages/ExpensesPage'
 import CalculatorPage from './pages/CalculatorPage'
+import MaterialsPage from './pages/MaterialsPage'
 import SettingsPage from './pages/SettingsPage'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import AppLayout from './components/shared/AppLayout'
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/produits" element={<ProductsPage />} />
               <Route path="/lots" element={<BatchesPage />} />
               <Route path="/inventaire" element={<InventoryPage />} />
+              <Route path="/matieres" element={<MaterialsPage />} />
               <Route path="/mouvements" element={<MovementsPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/ventes" element={<SalesPage />} />

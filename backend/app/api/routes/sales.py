@@ -26,6 +26,7 @@ def _to_read(sale: Sale) -> SaleRead:
         if it.product:
             item_read.product_name = it.product.name
             item_read.product_sku = it.product.sku
+            item_read.product_taxable = bool(it.product.taxable)
         out.items.append(item_read)
     return out
 

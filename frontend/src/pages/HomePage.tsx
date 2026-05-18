@@ -65,8 +65,8 @@ export default function HomePage() {
         <>
           {/* KPI cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Kpi icon={TrendingUp} label="Revenus payés" value={fmtCAD(report.revenue_paid)} tone="success" />
-            <Kpi icon={Wallet} label="Comptes à recevoir" value={fmtCAD(report.accounts_receivable)} tone="info" />
+            <Kpi icon={TrendingUp} label="Revenus payés (HT)" value={fmtCAD(report.revenue_paid)} tone="success" />
+            <Kpi icon={Wallet} label="Comptes à recevoir (HT)" value={fmtCAD(report.accounts_receivable)} tone="info" />
             <Kpi icon={TrendingDown} label="Dépenses" value={fmtCAD(report.expenses_total)} tone="danger" />
             <Kpi
               icon={TrendingUp}
@@ -75,6 +75,45 @@ export default function HomePage() {
               tone={report.net_profit >= 0 ? 'paprika' : 'danger'}
             />
           </div>
+
+          {/* Taxes QC à remettre — calcul TPS 5% + TVQ 9.975% sur le HT facturé (Payées + Livrées) */}
+          {(() => {
+            const TPS_RATE = 0.05
+            const TVQ_RATE = 0.09975
+            const totalHT = (report.revenue_paid || 0) + (report.accounts_receivable || 0)
+            const tps = totalHT * TPS_RATE
+            const tvq = totalHT * TVQ_RATE
+            const ttc = totalHT + tps + tvq
+            return (
+              <Card className="mb-6 ring-amber-200 bg-amber-50/30">
+                <CardHeader title="Taxes Québec — à remettre trimestriellement"
+                  subtitle={`TPS 5% + TVQ 9,975% sur CA HT facturé (${fmtCAD(totalHT)})`} />
+                <CardBody>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="bg-white rounded-lg p-3 ring-1 ring-stone-200">
+                      <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">CA HT</div>
+                      <div className="text-xl font-bold tabular-nums mt-1">{fmtCAD(totalHT)}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 ring-1 ring-stone-200">
+                      <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">TPS collectée (5%)</div>
+                      <div className="text-xl font-bold tabular-nums mt-1 text-amber-700">{fmtCAD(tps)}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 ring-1 ring-stone-200">
+                      <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">TVQ collectée (9,975%)</div>
+                      <div className="text-xl font-bold tabular-nums mt-1 text-amber-700">{fmtCAD(tvq)}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 ring-1 ring-chika-paprika/40">
+                      <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">CA TTC facturé</div>
+                      <div className="text-xl font-bold tabular-nums mt-1 text-chika-paprika">{fmtCAD(ttc)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-[11px] text-amber-800 italic">
+                    💡 <strong>{fmtCAD(tps + tvq)}</strong> sont à remettre à Revenu Québec lors de ta prochaine déclaration TPS/TVQ trimestrielle. Mets-les de côté dans un compte séparé.
+                  </div>
+                </CardBody>
+              </Card>
+            )
+          })()}
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

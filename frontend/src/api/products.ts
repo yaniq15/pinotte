@@ -13,6 +13,7 @@ export interface Product {
   currency: string
   active: boolean
   image_url: string | null
+  taxable: boolean
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ export interface ProductPayload {
   currency?: string
   active?: boolean
   image_url?: string | null
+  taxable?: boolean
 }
 
 export async function listProducts(): Promise<Product[]> {
@@ -48,4 +50,15 @@ export async function updateProduct(id: number, payload: Partial<ProductPayload>
 
 export async function deleteProduct(id: number): Promise<void> {
   await api.delete(`/api/products/${id}`)
+}
+
+export async function uploadProductImage(id: number, file: File): Promise<Product> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post<Product>(
+    `/api/products/${id}/upload-image`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return data
 }

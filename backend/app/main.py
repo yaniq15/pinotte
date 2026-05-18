@@ -1,8 +1,12 @@
 """Chika FastAPI app entry point."""
 from contextlib import asynccontextmanager
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from .api.routes import auth as auth_routes
@@ -10,6 +14,7 @@ from .api.routes import batches as batch_routes
 from .api.routes import clients as client_routes
 from .api.routes import expenses as expense_routes
 from .api.routes import inventory as inventory_routes
+from .api.routes import materials as material_routes
 from .api.routes import movements as movement_routes
 from .api.routes import products as product_routes
 from .api.routes import recipes as recipe_routes
@@ -55,6 +60,11 @@ def create_app() -> FastAPI:
     def health() -> dict:
         return {"status": "ok"}
 
+    # Static files — uploaded product images served from /uploads/products/*
+    upload_dir = Path(os.environ.get("UPLOAD_DIR", "uploads"))
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+
     app.include_router(auth_routes.router,      prefix="/api")
     app.include_router(product_routes.router,   prefix="/api")
     app.include_router(batch_routes.router,     prefix="/api")
@@ -65,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(expense_routes.router,   prefix="/api")
     app.include_router(report_routes.router,    prefix="/api")
     app.include_router(recipe_routes.router,    prefix="/api")
+    app.include_router(material_routes.router,  prefix="/api")
 
     return app
 

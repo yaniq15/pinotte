@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Truck, DollarSign, Ban, Trash2 } from 'lucide-react'
+import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText } from 'lucide-react'
+import { downloadInvoice } from '../components/Invoice'
 import {
   listSales, createSale, updateSaleStatus,
   type SaleStatus, type SalePayload, type SaleItemPayload,
@@ -119,7 +120,10 @@ export default function SalesPage() {
                         <td className="px-5 py-3 text-stone-600 hidden sm:table-cell text-xs">
                           {s.items.map(it => `${it.quantity_boxes}× ${it.product_name}`).join(', ')}
                         </td>
-                        <td className="px-5 py-3 text-right tabular-nums font-semibold text-stone-900">{fmtCAD(s.total_amount)}</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-stone-900">
+                          <div className="font-semibold">{fmtCAD(s.total_amount)}<span className="text-[10px] text-stone-400 font-normal ml-0.5">HT</span></div>
+                          <div className="text-[10px] text-stone-500">{fmtCAD(Number(s.total_amount) * 1.14975)} TTC</div>
+                        </td>
                         <td className="px-5 py-3">
                           <Badge tone={meta.tone}>{meta.label}</Badge>
                           {s.payment_date && (
@@ -127,7 +131,13 @@ export default function SalesPage() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          <div className="flex gap-1 justify-end">
+                          <div className="flex gap-1 justify-end flex-wrap">
+                            {s.status !== 'CANCELLED' && (
+                              <Button size="sm" variant="ghost" icon={<FileText size={12} />}
+                                onClick={() => downloadInvoice(s)}>
+                                Facture
+                              </Button>
+                            )}
                             {s.status === 'PENDING' && (
                               <Button size="sm" variant="secondary" icon={<Truck size={12} />}
                                 onClick={() => transitionMut.mutate({ id: s.id, status: 'DELIVERED' })}>
@@ -196,35 +206,63 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l))
   }
 
+  /** Calcule le prix par caisse pour un (produit, client) donné.
+   *  Retourne 0 si le produit ou le client est manquant. */
+  function calcPriceForProduct(product: Product | undefined, client: Client | undefined): number {
+    if (!product || !client) return 0
+    const upb = product.units_per_box || 1
+    const direct = typeof product.price_direct === 'string' ? parseFloat(product.price_direct) : (product.price_direct || 0)
+    if (client.type === 'STORE') {
+      return +(direct * upb).toFixed(2)
+    }
+    // BROKER : utilise le taux du client, fallback price_broker
+    const distribRate = typeof client.distribution_rate_pct === 'string'
+      ? parseFloat(client.distribution_rate_pct)
+      : (client.distribution_rate_pct ?? null)
+    if (distribRate !== null && !isNaN(distribRate) && direct > 0) {
+      return +(direct * (1 - distribRate) * upb).toFixed(2)
+    }
+    const fallback = typeof product.price_broker === 'string' ? parseFloat(product.price_broker) : (product.price_broker || 0)
+    return +(fallback * upb).toFixed(2)
+  }
+
   function pickProduct(i: number, productId: string) {
     const pid = Number(productId)
-    const product: Product | undefined = products.data?.find(p => p.id === pid)
-    let price = 0
-    if (product && selectedClient) {
-      const direct = typeof product.price_direct === 'string' ? parseFloat(product.price_direct) : (product.price_direct || 0)
-      if (selectedClient.type === 'STORE') {
-        price = direct
-      } else {
-        // BROKER: re-derive from the client's actual distribution rate.
-        // If client has no rate, fall back to the stored price_broker.
-        const distribRate = typeof selectedClient.distribution_rate_pct === 'string'
-          ? parseFloat(selectedClient.distribution_rate_pct)
-          : (selectedClient.distribution_rate_pct ?? null)
-        if (distribRate !== null && !isNaN(distribRate) && direct > 0) {
-          price = +(direct * (1 - distribRate)).toFixed(2)
-        } else {
-          const fallback = typeof product.price_broker === 'string' ? parseFloat(product.price_broker) : (product.price_broker || 0)
-          price = fallback
-        }
-      }
-    }
+    const product = products.data?.find(p => p.id === pid)
+    const price = calcPriceForProduct(product, selectedClient)
     updateLine(i, { product_id: pid, unit_price: price })
   }
+
+  // Re-applique les prix quand le client change (utile si l'user a choisi
+  // le produit AVANT de choisir le client : sans ce useEffect, le prix
+  // resterait à 0 jusqu'à ré-ouvrir le dropdown produit).
+  useEffect(() => {
+    if (!selectedClient || !products.data) return
+    setLines(ls => ls.map(l => {
+      if (l.product_id === '') return l
+      const product = products.data!.find(p => p.id === Number(l.product_id))
+      const newPrice = calcPriceForProduct(product, selectedClient)
+      // N'écrase pas un prix custom (user a tapé un montant différent)
+      // que si le prix actuel = 0 OU correspond à l'ancien prix auto (déjà appliqué une fois)
+      return { ...l, unit_price: newPrice }
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId])
 
   function addLine() { setLines(ls => [...ls, { product_id: '', quantity_boxes: 1, unit_price: 0 }]) }
   function removeLine(i: number) { setLines(ls => ls.filter((_, idx) => idx !== i)) }
 
-  const total = lines.reduce((s, l) => s + l.quantity_boxes * l.unit_price, 0)
+  const totalHT = lines.reduce((s, l) => s + l.quantity_boxes * l.unit_price, 0)
+  // Taxes ligne par ligne : un produit non taxable (épicerie de base QC) n'a pas de TPS/TVQ.
+  const taxableHT = lines.reduce((s, l) => {
+    if (l.product_id === '') return s
+    const product = products.data?.find(p => p.id === Number(l.product_id))
+    return product?.taxable ? s + l.quantity_boxes * l.unit_price : s
+  }, 0)
+  const tps = +(taxableHT * 0.05).toFixed(2)
+  const tvq = +(taxableHT * 0.09975).toFixed(2)
+  const totalTTC = +(totalHT + tps + tvq).toFixed(2)
+  const total = totalHT  // alias pour compat backend (envoie HT)
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -318,17 +356,47 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputCls} />
         </Field>
 
-        <div className="flex items-center justify-between border-t border-stone-100 pt-4">
-          <div>
-            <div className="text-xs text-stone-500 uppercase tracking-wider">Total</div>
-            <div className="text-2xl font-bold text-chika-paprika tabular-nums">{fmtCAD(total)}</div>
+        {/* Breakdown HT / Taxes / TTC */}
+        <div className="border-t border-stone-100 pt-4 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-stone-600">Total HT</span>
+            <span className="tabular-nums font-semibold">{fmtCAD(totalHT)}</span>
           </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
-            <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
-              {mut.isPending ? '…' : 'Créer la vente'}
-            </Button>
+          {taxableHT > 0 ? (
+            <>
+              <div className="flex justify-between text-[10px] text-stone-400 italic">
+                <span>Dont taxable HT</span>
+                <span className="tabular-nums">{fmtCAD(taxableHT)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-stone-500">
+                <span>+ TPS (5 %)</span>
+                <span className="tabular-nums">{fmtCAD(tps)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-stone-500">
+                <span>+ TVQ (9,975 %)</span>
+                <span className="tabular-nums">{fmtCAD(tvq)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between text-xs text-emerald-700 italic">
+              <span>Tous produits détaxés (épicerie QC)</span>
+              <span>0,00 $</span>
+            </div>
+          )}
+          <div className="flex justify-between border-t border-stone-100 pt-2 mt-1">
+            <span className="text-xs uppercase tracking-wider font-bold text-chika-paprika">Total TTC (à facturer)</span>
+            <span className="text-xl font-bold tabular-nums text-chika-paprika">{fmtCAD(totalTTC)}</span>
           </div>
+          <p className="text-[10px] text-stone-400 italic mt-1">
+            Tu factures le TTC. Tu gardes le HT ; la TPS+TVQ collectée ({fmtCAD(tps + tvq)}) sera remise à Revenu Québec trimestriellement.
+          </p>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-100">
+          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? '…' : 'Créer la vente'}
+          </Button>
         </div>
       </div>
     </div>
