@@ -7,6 +7,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useCurrentUser, clearToken } from '../../hooks/useAuth'
 import { BRAND } from '../../lib/brand'
+import { useLang } from '../../lib/i18n'
 
 interface NavItem {
   to: string
@@ -107,9 +108,10 @@ export default function AppLayout() {
           </button>
           {userMenuOpen && (
             <div className="absolute bottom-full left-3 right-3 mb-1 bg-white rounded-lg ring-1 ring-stone-200 shadow-lg overflow-hidden">
+              <LangToggle />
               <button onClick={logout}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-stone-700 hover:bg-red-50 hover:text-red-700 transition">
-                <LogOut size={14} /> Se déconnecter
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-stone-700 hover:bg-red-50 hover:text-red-700 transition border-t border-stone-100">
+                <LogOut size={14} /> Se déconnecter / Logout
               </button>
             </div>
           )}
@@ -184,3 +186,19 @@ export function PageHeader({
     </div>
   )
 }
+
+function LangToggle() {
+  const [lang, setLang] = useLang()
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-2 text-[12px] text-stone-600">
+      <span className="font-medium">Langue / Language</span>
+      <div className="inline-flex rounded-md ring-1 ring-stone-200 overflow-hidden">
+        <button onClick={() => setLang('fr')}
+          className={`px-2 py-0.5 text-[11px] font-semibold ${lang === 'fr' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-600 hover:bg-stone-50'}`}>FR</button>
+        <button onClick={() => setLang('en')}
+          className={`px-2 py-0.5 text-[11px] font-semibold ${lang === 'en' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-600 hover:bg-stone-50'}`}>EN</button>
+      </div>
+    </div>
+  )
+}
+

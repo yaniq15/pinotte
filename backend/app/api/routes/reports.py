@@ -69,7 +69,7 @@ def monthly_report(
     # 4. Net profit (revenue paid − expenses this month)
     net_profit = revenue_paid - expenses_total
 
-    # 5. Sales by product (paid + delivered, this month, via sale_items × sale_date)
+    # 5. Sales by product (toutes non-annulées + sous-total PAID seulement)
     sales_by_product_rows = db.execute(
         select(
             Product.id, Product.name, Product.sku, Product.units_per_box, Product.unit_cost,
@@ -83,15 +83,34 @@ def monthly_report(
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
 
+    # 5b. Revenus encaissés (PAID) par produit
+    paid_rows = db.execute(
+        select(
+            SaleItem.product_id,
+            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue_paid"),
+            func.coalesce(func.sum(SaleItem.quantity_boxes), 0).label("boxes_paid"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(Sale.sale_date.between(start, end), Sale.status == "PAID")
+        .group_by(SaleItem.product_id)
+    ).all()
+    paid_by_pid = {r.product_id: (float(r.revenue_paid), int(r.boxes_paid)) for r in paid_rows}
+
     sales_by_product = []
     margin_by_product = []
     for row in sales_by_product_rows:
         boxes = int(row.boxes)
         revenue = float(row.revenue)
-        # Cost = boxes * units_per_box * unit_cost
         cost = float(boxes * row.units_per_box * (row.unit_cost or 0))
         margin = revenue - cost
         margin_pct = (margin / revenue * 100) if revenue else 0
+
+        # Marge encaissée (sur ventes PAID seulement)
+        rev_paid, boxes_paid = paid_by_pid.get(row.id, (0.0, 0))
+        cost_paid = float(boxes_paid * row.units_per_box * (row.unit_cost or 0))
+        margin_paid = rev_paid - cost_paid
+        margin_paid_pct = (margin_paid / rev_paid * 100) if rev_paid else 0
+
         sales_by_product.append({
             "product_id": row.id, "product_name": row.name, "product_sku": row.sku,
             "boxes_sold": boxes, "revenue": revenue,
@@ -99,6 +118,8 @@ def monthly_report(
         margin_by_product.append({
             "product_id": row.id, "product_name": row.name,
             "revenue": revenue, "cost": cost, "margin": margin, "margin_pct": round(margin_pct, 1),
+            "revenue_paid": rev_paid, "margin_paid": margin_paid,
+            "margin_paid_pct": round(margin_paid_pct, 1),
         })
 
     # 6. Top clients (by revenue this month, excluding cancelled)

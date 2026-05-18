@@ -12,6 +12,7 @@ from sqlalchemy import select
 from .api.routes import auth as auth_routes
 from .api.routes import batches as batch_routes
 from .api.routes import clients as client_routes
+from .api.routes import events as event_routes
 from .api.routes import expenses as expense_routes
 from .api.routes import inventory as inventory_routes
 from .api.routes import materials as material_routes
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(report_routes.router,    prefix="/api")
     app.include_router(recipe_routes.router,    prefix="/api")
     app.include_router(material_routes.router,  prefix="/api")
+    app.include_router(event_routes.router,     prefix="/api")
 
     return app
 

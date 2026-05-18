@@ -33,15 +33,41 @@ export default function ExpensesPage() {
   const qc = useQueryClient()
   const [filterCat, setFilterCat] = useState('')
   const [filterProduct, setFilterProduct] = useState('')
+  const today = new Date()
+  const [filterPeriod, setFilterPeriod] = useState<'month' | 'year' | 'all'>('month')
+  const [filterMonth, setFilterMonth] = useState<string>(
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  )
+  const [filterYear, setFilterYear] = useState<string>(String(today.getFullYear()))
   const [showForm, setShowForm] = useState(false)
 
   const categories = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
+
+  // Calcul des bornes de date selon la période choisie
+  const dateRange = (() => {
+    if (filterPeriod === 'all') return { date_from: undefined, date_to: undefined }
+    if (filterPeriod === 'year') {
+      return {
+        date_from: `${filterYear}-01-01`,
+        date_to: `${filterYear}-12-31`,
+      }
+    }
+    // month
+    const [y, m] = filterMonth.split('-').map(Number)
+    const firstDay = `${filterMonth}-01`
+    const lastDayOfMonth = new Date(y, m, 0).getDate()
+    const lastDay = `${filterMonth}-${String(lastDayOfMonth).padStart(2, '0')}`
+    return { date_from: firstDay, date_to: lastDay }
+  })()
+
   const expenses = useQuery({
-    queryKey: ['expenses', filterCat, filterProduct],
+    queryKey: ['expenses', filterCat, filterProduct, filterPeriod, filterMonth, filterYear],
     queryFn: () => listExpenses({
       category_id: filterCat ? Number(filterCat) : undefined,
       product_id: filterProduct ? Number(filterProduct) : undefined,
+      date_from: dateRange.date_from,
+      date_to: dateRange.date_to,
     }),
   })
 
@@ -95,6 +121,24 @@ export default function ExpensesPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-stone-200 p-4 mb-4 flex items-center gap-3 flex-wrap">
+        {/* Période */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-semibold text-stone-700">Période :</label>
+          <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value as 'month' | 'year' | 'all')}
+            className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
+            <option value="month">Mois</option>
+            <option value="year">Année</option>
+            <option value="all">Tout l'historique</option>
+          </select>
+          {filterPeriod === 'month' && (
+            <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+              className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm" />
+          )}
+          {filterPeriod === 'year' && (
+            <input type="number" min="2020" max="2100" value={filterYear} onChange={e => setFilterYear(e.target.value)}
+              className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm w-24" />
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-semibold text-stone-700">Catégorie :</label>
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, X, ShoppingCart, AlertTriangle, Trash2 } from 'lucide-react'
+import { Plus, X, ShoppingCart, AlertTriangle, Trash2, Pencil } from 'lucide-react'
 import {
   listMaterials, createMaterial, updateMaterial, deleteMaterial,
   listPurchases, createPurchase, deletePurchase,
@@ -33,6 +33,7 @@ export default function MaterialsPage() {
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const [showPurchaseForm, setShowPurchaseForm] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null)
 
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => listMaterials() })
   const purchases = useQuery({
@@ -67,15 +68,15 @@ export default function MaterialsPage() {
       <PageHeader
         title="Matières premières"
         description="Stock de tes ingrédients + approvisionnements. Prix moyen pondéré auto-calculé."
-        actions={
-          <div className="flex gap-2">
+        action={
+          <>
             <Button variant="secondary" icon={<Plus size={14} />} onClick={() => setShowMaterialForm(true)}>
               Nouvelle matière
             </Button>
             <Button icon={<ShoppingCart size={14} />} onClick={() => setShowPurchaseForm(true)}>
               Approvisionnement
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -124,7 +125,7 @@ export default function MaterialsPage() {
                     <th className="text-right px-4 py-3">Stock</th>
                     <th className="text-right px-4 py-3">PMP</th>
                     <th className="text-right px-4 py-3">Valeur</th>
-                    <th className="w-12 px-2"></th>
+                    <th className="w-20 px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,10 +154,16 @@ export default function MaterialsPage() {
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums font-semibold">{fmtCAD(value)}</td>
                         <td className="px-2 py-3">
-                          <button onClick={e => { e.stopPropagation(); handleDeleteMaterial(m) }}
-                            className="text-stone-400 hover:text-red-600 p-1" title="Supprimer">
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="flex gap-1">
+                            <button onClick={e => { e.stopPropagation(); setEditingMaterial(m) }}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 hover:bg-chika-paprika hover:text-white text-stone-700 text-xs font-medium" title="Modifier">
+                              <Pencil size={12} /> Modifier
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); handleDeleteMaterial(m) }}
+                              className="inline-flex items-center px-2 py-1 rounded-md bg-stone-100 hover:bg-red-600 hover:text-white text-stone-700" title="Supprimer">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -204,12 +211,14 @@ export default function MaterialsPage() {
         </Card>
       </div>
 
-      {showMaterialForm && (
+      {(showMaterialForm || editingMaterial) && (
         <MaterialForm
-          onClose={() => setShowMaterialForm(false)}
+          editing={editingMaterial}
+          onClose={() => { setShowMaterialForm(false); setEditingMaterial(null) }}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['materials'] })
             setShowMaterialForm(false)
+            setEditingMaterial(null)
           }}
         />
       )}
@@ -284,20 +293,35 @@ type MaterialFormData = {
   notes?: string | null
 }
 
-function MaterialForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function MaterialForm({ editing, onClose, onSaved }: {
+  editing?: Material | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const isEdit = !!editing
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MaterialFormData>({
-    defaultValues: { unit: 'kg' },
+    defaultValues: editing
+      ? {
+          name: editing.name,
+          unit: editing.unit,
+          low_stock_threshold: editing.low_stock_threshold == null ? undefined : Number(editing.low_stock_threshold),
+          notes: editing.notes ?? '',
+        }
+      : { unit: 'kg' },
   })
   const [serverError, setServerError] = useState<string | null>(null)
 
   const mut = useMutation({
     mutationFn: async (v: MaterialFormData) => {
-      return createMaterial({
+      const payload = {
         name: v.name.trim(),
         unit: v.unit.trim(),
         low_stock_threshold: v.low_stock_threshold ? Number(v.low_stock_threshold) : null,
         notes: v.notes || null,
-      })
+      }
+      return isEdit
+        ? updateMaterial(editing!.id, payload)
+        : createMaterial(payload)
     },
     onSuccess: onSaved,
     onError: (err: unknown) => {
@@ -312,7 +336,7 @@ function MaterialForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Nouvelle matière</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier la matière' : 'Nouvelle matière'}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && (
