@@ -7,7 +7,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
+
+from .core.rate_limit import limiter
 
 from .api.routes import auth as auth_routes
 from .api.routes import batches as batch_routes
@@ -17,6 +21,7 @@ from .api.routes import expenses as expense_routes
 from .api.routes import inventory as inventory_routes
 from .api.routes import materials as material_routes
 from .api.routes import movements as movement_routes
+from .api.routes import pme as pme_routes
 from .api.routes import products as product_routes
 from .api.routes import recipes as recipe_routes
 from .api.routes import reports as report_routes
@@ -47,7 +52,14 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # Safety check : empêche le boot en prod avec le secret JWT par défaut
+    settings.assert_prod_safe()
+
     app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+
+    # Rate limiter slowapi (in-memory) — handler 429 sur dépassement
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     app.add_middleware(
         CORSMiddleware,
@@ -78,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(recipe_routes.router,    prefix="/api")
     app.include_router(material_routes.router,  prefix="/api")
     app.include_router(event_routes.router,     prefix="/api")
+    app.include_router(pme_routes.router,       prefix="/api")
 
     return app
 

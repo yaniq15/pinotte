@@ -14,6 +14,18 @@ _BCRYPT_ROUNDS = 12
 _MAX_PASSWORD_BYTES = 72
 
 
+def validate_password_strength(plain: str) -> None:
+    """Raise ValueError si le mot de passe ne respecte pas la policy.
+    Politique : ≥ PASSWORD_MIN_LENGTH chars + au moins 1 chiffre.
+    """
+    if len(plain) < settings.PASSWORD_MIN_LENGTH:
+        raise ValueError(
+            f"Mot de passe trop court (min {settings.PASSWORD_MIN_LENGTH} caractères)"
+        )
+    if not any(c.isdigit() for c in plain):
+        raise ValueError("Le mot de passe doit contenir au moins 1 chiffre")
+
+
 def hash_password(plain: str) -> str:
     pw = plain.encode("utf-8")
     if len(pw) > _MAX_PASSWORD_BYTES:

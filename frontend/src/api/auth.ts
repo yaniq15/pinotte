@@ -15,3 +15,21 @@ export async function me(): Promise<User> {
   const { data } = await api.get<User>('/api/auth/me')
   return data
 }
+
+// ── Google OAuth ────────────────────────────────────────────────
+export interface AuthConfig {
+  public_signup_enabled: boolean
+  google_oauth_enabled: boolean
+  google_oauth_client_id: string
+  password_min_length: number
+}
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const { data } = await api.get<AuthConfig>('/api/auth/config')
+  return data
+}
+
+export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/api/auth/google', { id_token: idToken })
+  return data
+}
