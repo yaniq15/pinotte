@@ -16,7 +16,7 @@ export default function InventoryPage() {
   const lowStockCount = rows.filter(r => r.low_stock).length
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-6xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl">
       <PageHeader title="Inventaire" description="Stock courant calculé à partir des mouvements." />
 
       {/* KPI strip */}
@@ -41,7 +41,7 @@ export default function InventoryPage() {
 
       {isLoading && <div className="text-stone-400 text-sm">Chargement…</div>}
 
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
             <tr>
@@ -56,11 +56,11 @@ export default function InventoryPage() {
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.product_id} className={`border-t border-stone-100 ${r.low_stock ? 'bg-amber-50/50' : ''}`}>
+              <tr key={r.product_id} className={`border-t border-stone-200 ${r.low_stock ? 'bg-amber-50/50' : ''}`}>
                 <td className="px-4 py-3 flex items-center gap-3">
                   {r.image_url && (
                     <img src={r.image_url} alt={r.product_name}
-                         className="w-10 h-10 object-contain rounded bg-stone-50 border border-stone-100 shrink-0" />
+                         className="w-10 h-10 object-contain rounded bg-stone-50 border border-stone-200 shrink-0" />
                   )}
                   <span className="font-semibold text-stone-900">{r.product_name}</span>
                 </td>
@@ -84,7 +84,7 @@ export default function InventoryPage() {
             )}
           </tbody>
         </table>
-        <div className="bg-stone-50 px-4 py-2 text-[11px] text-stone-500 border-t border-stone-100">
+        <div className="bg-stone-50 px-4 py-2 text-[11px] text-stone-500 border-t border-stone-200">
           Stock bas = moins de 10 boîtes. Stock = SUM(mouvements) calculé en temps réel.
         </div>
       </div>

@@ -46,7 +46,9 @@ def create(db: Session, payload: BatchCreate, created_by: User) -> Batch:
         notes=f"Production lot {batch.batch_number}",
     ))
 
-    # Auto-déduction des matières premières si la recette est liée
+    # Auto-déduction des matières premières via le lien dur material_id.
+    # Les lignes sans material_id (emballage, main d'œuvre, divers) sont ignorées
+    # côté stock matières — elles servent juste au calcul du coût de revient.
     from ..models.material import Material, MaterialMovement
     product = db.get(Product, batch.product_id)
     if product and product.batch_yield_units and product.ingredients:
@@ -54,10 +56,9 @@ def create(db: Session, payload: BatchCreate, created_by: User) -> Batch:
         if product.batch_yield_units > 0:
             batches_factor = Decimal(units_produced) / Decimal(product.batch_yield_units)
             for ing in product.ingredients:
-                # Skip lignes auto (emballage, main d'œuvre) qui ne sont pas des matières premières
-                if ing.name.startswith("[Auto]"):
+                if ing.material_id is None:
                     continue
-                material = db.scalar(select(Material).where(Material.name == ing.name))
+                material = db.get(Material, ing.material_id)
                 if not material:
                     continue
                 qty_consumed = (Decimal(ing.quantity) * batches_factor).quantize(Decimal("0.0001"))

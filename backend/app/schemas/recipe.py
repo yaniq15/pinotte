@@ -12,12 +12,22 @@ class IngredientIn(BaseModel):
         description="Prix par UNE unité (par g, par ml, etc. selon `unit`).")
     notes: Optional[str] = None
     sort_order: int = 0
+    # Lien optionnel au catalogue Matières premières. Si renseigné, la
+    # consommation d'un batch décrémentera le stock de cette matière (par ID,
+    # pas par nom — robuste aux accents/typos).
+    material_id: Optional[int] = Field(None,
+        description="FK vers materials.id. Si NULL, ligne 'auto' (emballage, MO).")
 
 
 class IngredientOut(IngredientIn):
     model_config = ConfigDict(from_attributes=True)
     id: int
     line_cost: Optional[Decimal] = None  # computed: quantity * unit_price
+    # Données de la matière liée (renvoyées pour l'affichage)
+    material_name: Optional[str] = None
+    material_unit: Optional[str] = None
+    material_current_stock: Optional[Decimal] = None
+    material_pmp: Optional[Decimal] = None
 
 
 class RecipePut(BaseModel):

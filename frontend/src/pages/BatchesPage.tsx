@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, X, Trash2 } from 'lucide-react'
+import { Plus, X, Trash2, Tag } from 'lucide-react'
 import {
   listBatches, createBatch, deleteBatch,
   type Batch, type BatchPayload,
 } from '../api/batches'
 import { listProducts } from '../api/products'
 import { PageHeader } from '../components/shared/AppLayout'
+import BatchLabels from '../components/BatchLabels'
 
 const schema = z.object({
   product_id: z.coerce.number().int().positive('Produit requis'),
@@ -37,6 +38,7 @@ export default function BatchesPage() {
   const qc = useQueryClient()
   const [filterProduct, setFilterProduct] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
+  const [labelBatch, setLabelBatch] = useState<Batch | null>(null)
 
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const batches = useQuery({
@@ -45,7 +47,7 @@ export default function BatchesPage() {
   })
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-6xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl">
       <PageHeader
         title="Lots de production"
         description="Historique des productions par lot avec traçabilité et coût unitaire calculé."
@@ -69,7 +71,7 @@ export default function BatchesPage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
             <tr>
@@ -80,12 +82,12 @@ export default function BatchesPage() {
               <th className="text-right px-4 py-3">Boîtes</th>
               <th className="text-right px-4 py-3 hidden md:table-cell">Coût total</th>
               <th className="text-right px-4 py-3">Coût/unité</th>
-              <th className="px-4 py-3 w-12"></th>
+              <th className="px-4 py-3 w-24"></th>
             </tr>
           </thead>
           <tbody>
             {(batches.data ?? []).map(b => (
-              <tr key={b.id} className="border-t border-stone-100 hover:bg-stone-50">
+              <tr key={b.id} className="border-t border-stone-200 hover:bg-stone-50">
                 <td className="px-4 py-3 font-mono text-xs text-stone-700">{b.batch_number}</td>
                 <td className="px-4 py-3 font-semibold text-stone-900">{b.product_name ?? '—'}</td>
                 <td className="px-4 py-3 text-stone-600 hidden sm:table-cell">{fmtDate(b.production_date)}</td>
@@ -94,11 +96,16 @@ export default function BatchesPage() {
                 <td className="px-4 py-3 text-right tabular-nums text-stone-700 hidden md:table-cell">{fmtCAD(b.total_cost)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-chika-paprika font-semibold">{fmtCAD(b.unit_cost)}</td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => {
-                    if (window.confirm(`Supprimer le lot ${b.batch_number} ?`)) {
-                      deleteBatch(b.id).then(() => qc.invalidateQueries({ queryKey: ['batches'] }))
-                    }
-                  }} className="text-stone-400 hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                  <div className="inline-flex items-center gap-1">
+                    <button onClick={() => setLabelBatch(b)}
+                      title="Imprimer des étiquettes pour ce lot"
+                      className="text-stone-400 hover:text-chika-paprika p-1"><Tag size={14} /></button>
+                    <button onClick={() => {
+                      if (window.confirm(`Supprimer le lot ${b.batch_number} ?`)) {
+                        deleteBatch(b.id).then(() => qc.invalidateQueries({ queryKey: ['batches'] }))
+                      }
+                    }} className="text-stone-400 hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -116,6 +123,10 @@ export default function BatchesPage() {
           qc.invalidateQueries({ queryKey: ['batches'] })
           setShowForm(false)
         }} />
+      )}
+
+      {labelBatch && (
+        <BatchLabels batch={labelBatch} onClose={() => setLabelBatch(null)} />
       )}
     </div>
   )

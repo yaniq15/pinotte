@@ -57,7 +57,7 @@ export default function SalesPage() {
   })
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-7xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
         title="Ventes"
         description="Bons de vente courtier et magasin direct."
@@ -73,7 +73,7 @@ export default function SalesPage() {
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-stone-600">Client</label>
             <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              className="px-3 py-1.5 ring-1 ring-stone-200 bg-white rounded-lg text-sm">
+              className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
               <option value="">Tous</option>
               {clients.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -81,7 +81,7 @@ export default function SalesPage() {
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-stone-600">Statut</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 ring-1 ring-stone-200 bg-white rounded-lg text-sm">
+              className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
               <option value="">Tous</option>
               {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
             </select>
@@ -113,7 +113,7 @@ export default function SalesPage() {
                   {(sales.data ?? []).map(s => {
                     const meta = STATUS_META[s.status]
                     return (
-                      <tr key={s.id} className="border-t border-stone-100 hover:bg-stone-50 transition">
+                      <tr key={s.id} className="border-t border-stone-200 hover:bg-stone-50 transition">
                         <td className="px-5 py-3 font-mono text-xs text-stone-500">#{s.id}</td>
                         <td className="px-5 py-3 text-stone-700">{fmtDate(s.sale_date)}</td>
                         <td className="px-5 py-3 font-medium text-stone-900">{s.client_name}</td>
@@ -357,7 +357,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         </Field>
 
         {/* Breakdown HT / Taxes / TTC */}
-        <div className="border-t border-stone-100 pt-4 space-y-1">
+        <div className="border-t border-stone-200 pt-4 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-stone-600">Total HT</span>
             <span className="tabular-nums font-semibold">{fmtCAD(totalHT)}</span>
@@ -383,7 +383,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
               <span>0,00 $</span>
             </div>
           )}
-          <div className="flex justify-between border-t border-stone-100 pt-2 mt-1">
+          <div className="flex justify-between border-t border-stone-200 pt-2 mt-1">
             <span className="text-xs uppercase tracking-wider font-bold text-chika-paprika">Total TTC (à facturer)</span>
             <span className="text-xl font-bold tabular-nums text-chika-paprika">{fmtCAD(totalTTC)}</span>
           </div>
@@ -392,7 +392,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           </p>
         </div>
 
-        <div className="flex gap-2 justify-end pt-2 border-t border-stone-100">
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
           <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
             {mut.isPending ? '…' : 'Créer la vente'}

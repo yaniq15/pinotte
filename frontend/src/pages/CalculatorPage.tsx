@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Save, Calculator, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Save, Calculator, CheckCircle2, Link2, Link2Off, X, AlertTriangle } from 'lucide-react'
 import { listProducts } from '../api/products'
 import { getRecipe, putRecipe, applyCost, type RecipeIngredient } from '../api/recipes'
-import { listMaterials, type Material } from '../api/materials'
+import { listMaterials, createMaterial, type Material } from '../api/materials'
 import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -82,14 +82,23 @@ export default function CalculatorPage() {
         ? realIngs.map(i => ({
             name: i.name, unit: i.unit, quantity: i.quantity, unit_price: i.unit_price,
             notes: i.notes, sort_order: i.sort_order,
+            material_id: i.material_id ?? null,
+            material_name: i.material_name,
+            material_unit: i.material_unit,
+            material_current_stock: i.material_current_stock,
+            material_pmp: i.material_pmp,
           }))
         : [emptyLine()])
     }
   }, [recipe.data])
 
   function emptyLine(): RecipeIngredient {
-    return { name: '', unit: 'g', quantity: 0, unit_price: null }
+    return { name: '', unit: 'g', quantity: 0, unit_price: null, material_id: null }
   }
+
+  // Modal quick-create matière : si non-null, on affiche le modal pour
+  // créer une matière depuis la recette + auto-liée à la ligne d'index `idx`.
+  const [quickCreate, setQuickCreate] = useState<{ idx: number; initialName: string } | null>(null)
 
   function updateLine(i: number, patch: Partial<RecipeIngredient>) {
     setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l))
@@ -128,18 +137,19 @@ export default function CalculatorPage() {
         unit_price: l.unit_price === null || l.unit_price === undefined || l.unit_price === ('' as unknown as number) ? null : Number(l.unit_price),
         notes: l.notes || null,
         sort_order: i,
+        material_id: l.material_id ?? null,
       }))
     const autos: typeof real = []
     if (pkgPerUnit > 0 && yieldNum > 0) {
       autos.push({
         name: PACKAGING_TAG, unit: 'u', quantity: yieldNum,
-        unit_price: pkgPerUnit, notes: null, sort_order: 1000,
+        unit_price: pkgPerUnit, notes: null, sort_order: 1000, material_id: null,
       })
     }
     if (lbrPerUnit > 0 && yieldNum > 0) {
       autos.push({
         name: LABOR_TAG, unit: 'u', quantity: yieldNum,
-        unit_price: lbrPerUnit, notes: null, sort_order: 1001,
+        unit_price: lbrPerUnit, notes: null, sort_order: 1001, material_id: null,
       })
     }
     return [...real, ...autos]
@@ -188,13 +198,7 @@ export default function CalculatorPage() {
     ? costPerUnit - Number(currentUnitCost) : null
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-7xl">
-      {/* Datalist global pour l'autocomplete depuis le catalogue Matières */}
-      <datalist id="materials-catalog">
-        {materials.data?.map(m => (
-          <option key={m.id} value={m.name}>{m.unit} · {Number(m.weighted_avg_price).toFixed(2)} $/{m.unit}</option>
-        ))}
-      </datalist>
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
         title="Calculateur de coût"
         description="Saisis la recette d'un produit → coût unitaire calculé automatiquement."
@@ -301,7 +305,7 @@ export default function CalculatorPage() {
                   </div>
 
                   {yieldTheoretical !== null && (
-                    <div className="text-xs text-stone-700 bg-white rounded-lg ring-1 ring-stone-200 p-3">
+                    <div className="text-xs text-stone-700 bg-white rounded-lg ring-1 ring-stone-300 p-3">
                       <div className="flex justify-between items-center">
                         <span>Rendement théorique <span className="text-stone-400">({batchMassG} g ÷ {unitMassG} g)</span></span>
                         <strong className="tabular-nums">{yieldTheoretical} sacs</strong>
@@ -312,7 +316,7 @@ export default function CalculatorPage() {
                           <span className="tabular-nums text-stone-500">−{yieldTheoretical - (yieldEffective ?? 0)} sacs</span>
                         </div>
                       )}
-                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-stone-100">
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-stone-200">
                         <strong>Rendement effectif</strong>
                         <strong className="tabular-nums text-chika-paprika text-base">{yieldEffective} sacs</strong>
                       </div>
@@ -354,25 +358,22 @@ export default function CalculatorPage() {
                   </thead>
                   <tbody>
                     {linesWithCost.map((l, i) => (
-                      <tr key={i} className="border-t border-stone-100">
-                        <td className="px-4 py-2">
-                          <input value={l.name}
-                            onChange={e => {
-                              const newName = e.target.value
-                              // Auto-fill depuis catalogue Matières si le nom match exactement
-                              const match: Material | undefined = materials.data?.find(m => m.name === newName)
-                              if (match) {
-                                updateLine(i, {
-                                  name: newName,
-                                  unit: match.unit,
-                                  unit_price: Number(match.weighted_avg_price),
-                                })
-                              } else {
-                                updateLine(i, { name: newName })
-                              }
-                            }}
-                            list="materials-catalog"
-                            className={inputCls} placeholder="Pâte d'arachide / sélectionne dans la liste" />
+                      <tr key={i} className="border-t border-stone-200">
+                        <td className="px-4 py-2 align-top">
+                          <IngredientPicker
+                            value={l.name}
+                            materialId={l.material_id ?? null}
+                            materials={materials.data || []}
+                            onPick={(m) => updateLine(i, {
+                              material_id: m.id,
+                              name: m.name,
+                              unit: m.unit,
+                              unit_price: Number(m.weighted_avg_price),
+                            })}
+                            onUnlink={() => updateLine(i, { material_id: null })}
+                            onLabelChange={(name) => updateLine(i, { name, material_id: null })}
+                            onCreateRequest={(name) => setQuickCreate({ idx: i, initialName: name })}
+                          />
                         </td>
                         <td className="px-4 py-2">
                           <input type="number" step="0.0001" value={l.quantity}
@@ -419,7 +420,7 @@ export default function CalculatorPage() {
                   </tfoot>
                 </table>
               </div>
-              <div className="p-3 border-t border-stone-100">
+              <div className="p-3 border-t border-stone-200">
                 <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addLine}>
                   Ajouter une ligne
                 </Button>
@@ -536,8 +537,236 @@ export default function CalculatorPage() {
           </div>
         </>
       )}
+
+      {/* Modal quick-create matière (depuis n'importe quelle ligne de recette) */}
+      {quickCreate && (
+        <QuickCreateMaterialModal
+          initialName={quickCreate.initialName}
+          onClose={() => setQuickCreate(null)}
+          onCreated={(m) => {
+            // Auto-lier la matière fraichement créée à la ligne d'origine
+            updateLine(quickCreate.idx, {
+              material_id: m.id,
+              name: m.name,
+              unit: m.unit,
+              unit_price: Number(m.weighted_avg_price) || null,
+            })
+            qc.invalidateQueries({ queryKey: ['materials'] })
+            setQuickCreate(null)
+          }}
+        />
+      )}
     </div>
   )
 }
 
 const inputCls = "w-full px-2 py-1.5 ring-1 ring-stone-300 rounded-md focus:ring-2 focus:ring-chika-paprika focus:outline-none text-sm bg-white"
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// IngredientPicker : combobox typeahead + état "lié au catalogue" vs "libre".
+// Pas de match par nom : le lien est SEULEMENT établi quand l'user clique une
+// option du dropdown ou crée une matière via le CTA "+ Créer X".
+// ─────────────────────────────────────────────────────────────────────────
+function IngredientPicker({
+  value, materialId, materials,
+  onPick, onUnlink, onLabelChange, onCreateRequest,
+}: {
+  value: string
+  materialId: number | null
+  materials: Material[]
+  onPick: (m: Material) => void
+  onUnlink: () => void
+  onLabelChange: (name: string) => void
+  onCreateRequest: (name: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState(value)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Sync search local quand le value change depuis le parent (load recette)
+  useEffect(() => { setSearch(value) }, [value])
+
+  // Fermer au click extérieur
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const linked = materials.find(m => m.id === materialId) || null
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? materials.filter(m => m.name.toLowerCase().includes(q))
+    : materials.slice(0, 12) // les 12 premiers si rien tapé
+  const exactMatch = q && materials.some(m => m.name.toLowerCase() === q)
+
+  // ── État LIÉ ──
+  if (linked) {
+    const stock = Number(linked.current_stock)
+    const pmp = Number(linked.weighted_avg_price)
+    return (
+      <div className="space-y-1">
+        <div className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-emerald-50 ring-1 ring-emerald-300/60 text-sm w-full">
+          <Link2 size={13} className="text-emerald-600 shrink-0" />
+          <span className="font-medium text-emerald-900 truncate flex-1">{linked.name}</span>
+          <button
+            type="button"
+            onClick={onUnlink}
+            className="text-emerald-700/60 hover:text-red-600 shrink-0"
+            title="Délier du catalogue"
+          >
+            <Link2Off size={12} />
+          </button>
+        </div>
+        <div className="text-[10px] text-emerald-700/70 pl-1">
+          Stock {stock.toFixed(2)} {linked.unit} · PMP {pmp.toFixed(4)} $/{linked.unit}
+        </div>
+      </div>
+    )
+  }
+
+  // ── État NON LIÉ ──
+  return (
+    <div ref={ref} className="relative space-y-1">
+      <div className="inline-flex items-center gap-1.5 w-full">
+        <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+        <input
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value)
+            onLabelChange(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Tape pour chercher une matière…"
+          className={inputCls}
+        />
+      </div>
+      <div className="text-[10px] text-amber-700/80 pl-5">
+        Non lié au catalogue — stock matières ne sera pas décrémenté
+      </div>
+
+      {open && (
+        <div className="absolute z-30 left-5 right-0 top-full mt-1 bg-white rounded-lg ring-1 ring-stone-300 shadow-xl max-h-72 overflow-y-auto">
+          {filtered.length === 0 && !q && (
+            <div className="px-3 py-3 text-xs text-stone-500 italic">
+              Aucune matière dans ton catalogue. Crée-en une ci-dessous.
+            </div>
+          )}
+          {filtered.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => { onPick(m); setOpen(false); setSearch(m.name) }}
+              className="w-full text-left px-3 py-2 hover:bg-emerald-50/60 text-sm flex items-center justify-between gap-3 border-b border-stone-100 last:border-0"
+            >
+              <span className="font-medium text-stone-900 truncate">{m.name}</span>
+              <span className="text-[10px] text-stone-500 tabular-nums shrink-0">
+                {m.unit} · {Number(m.weighted_avg_price).toFixed(2)} $/{m.unit}
+              </span>
+            </button>
+          ))}
+          {q && !exactMatch && (
+            <button
+              type="button"
+              onClick={() => { onCreateRequest(search.trim()); setOpen(false) }}
+              className="w-full text-left px-3 py-2.5 text-sm font-semibold text-chika-paprika hover:bg-chika-paprika/5 border-t border-stone-200 inline-flex items-center gap-2"
+            >
+              <Plus size={14} />
+              Créer « {search.trim()} » dans le catalogue
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// QuickCreateMaterialModal : créer une matière depuis la recette sans naviguer.
+// ─────────────────────────────────────────────────────────────────────────
+function QuickCreateMaterialModal({
+  initialName, onClose, onCreated,
+}: {
+  initialName: string
+  onClose: () => void
+  onCreated: (m: Material) => void
+}) {
+  const [name, setName] = useState(initialName)
+  const [unit, setUnit] = useState('kg')
+  const [notes, setNotes] = useState('')
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const mut = useMutation({
+    mutationFn: async () => {
+      return createMaterial({
+        name: name.trim(),
+        unit: unit.trim(),
+        notes: notes.trim() || null,
+      })
+    },
+    onSuccess: onCreated,
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setServerError(msg || 'Erreur création matière')
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-900">Nouvelle matière première</h3>
+          <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-stone-500">
+          La matière sera ajoutée au catalogue et liée à cette ligne de recette. Le stock initial reste à 0 — tu pourras enregistrer un achat depuis la page Matières.
+        </p>
+
+        {serverError && (
+          <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>
+        )}
+
+        <div>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">Nom</label>
+          <input value={name} onChange={e => setName(e.target.value)} className={inputCls}
+            placeholder="Ex: Arachides crues" autoFocus />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">Unité de stockage</label>
+          <select value={unit} onChange={e => setUnit(e.target.value)} className={inputCls}>
+            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+          <p className="mt-1 text-[11px] text-stone-500">
+            L'unité dans laquelle tu suivras le stock (ex : kg, L). Tu peux utiliser une autre unité dans la recette si besoin.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">Notes (optionnel)</label>
+          <input value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} />
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" onClick={onClose}
+            className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">
+            Annuler
+          </button>
+          <button type="button"
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending || !name.trim()}
+            className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            {mut.isPending ? '…' : 'Créer et lier'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+

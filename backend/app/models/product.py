@@ -58,11 +58,19 @@ class Product(Base, TimestampMixin):
 
 
 class ProductIngredient(Base, TimestampMixin):
-    """One ingredient line in a product's recipe — quantity for ONE batch."""
+    """One ingredient line in a product's recipe — quantity for ONE batch.
+
+    `material_id` (nullable) lie la ligne au catalogue Matières premières.
+    Si renseigné, la consommation lors d'un batch décrémente le stock du matériau.
+    Si NULL → ligne "auto" (emballage, main d'œuvre…) qui ne touche pas le stock.
+    """
     __tablename__ = "product_ingredients"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    material_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     # Free-form unit label: 'g', 'kg', 'ml', 'L', 'unité', 'oz' … — we don't
     # try to normalise units server-side; the user enters the quantity AND
@@ -75,3 +83,4 @@ class ProductIngredient(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     product = relationship("Product", back_populates="ingredients")
+    material = relationship("Material", lazy="joined")

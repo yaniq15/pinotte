@@ -64,7 +64,7 @@ export default function MaterialsPage() {
   }
 
   return (
-    <div className="px-6 lg:px-10 py-8">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
       <PageHeader
         title="Matières premières"
         description="Stock de tes ingrédients + approvisionnements. Prix moyen pondéré auto-calculé."
@@ -138,7 +138,7 @@ export default function MaterialsPage() {
                     return (
                       <tr key={m.id}
                         onClick={() => setSelectedMaterial(m)}
-                        className={`border-t border-stone-100 cursor-pointer transition
+                        className={`border-t border-stone-200 cursor-pointer transition
                           ${isSelected ? 'bg-chika-creamSoft' : 'hover:bg-stone-50'}`}>
                         <td className="px-4 py-3">
                           <div className="font-medium text-stone-900">{m.name}</div>
@@ -185,7 +185,7 @@ export default function MaterialsPage() {
             )}
             {selectedMaterial && (
               <>
-                <div className="px-4 py-3 bg-chika-creamSoft/30 border-b border-stone-100 text-xs space-y-1">
+                <div className="px-4 py-3 bg-chika-creamSoft/30 border-b border-stone-200 text-xs space-y-1">
                   <div className="flex justify-between"><span>Stock</span><strong>{fmtNum(selectedMaterial.current_stock)} {selectedMaterial.unit}</strong></div>
                   <div className="flex justify-between"><span>PMP</span><strong>{fmtCAD(selectedMaterial.weighted_avg_price)}/{selectedMaterial.unit}</strong></div>
                   <div className="flex justify-between"><span>Valeur stock</span>
@@ -256,7 +256,7 @@ function PurchaseRow({ purchase: p, unit, onDeleted }: {
     }
   }
   return (
-    <div className="px-4 py-3 border-b border-stone-100 text-xs hover:bg-stone-50 group">
+    <div className="px-4 py-3 border-b border-stone-200 text-xs hover:bg-stone-50 group">
       <div className="flex items-center justify-between">
         <div className="font-semibold text-stone-900">{fmtNum(p.quantity)} {unit}</div>
         <div className="font-bold text-chika-paprika tabular-nums">{fmtCAD(p.total_cost)}</div>
@@ -356,7 +356,7 @@ function MaterialForm({ editing, onClose, onSaved }: {
           <textarea {...register('notes')} rows={2} className={inputCls} placeholder="Fournisseur préféré, qualité, etc." />
         </Field>
 
-        <div className="flex gap-2 justify-end pt-2 border-t border-stone-100">
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
           <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : 'Créer'}</Button>
         </div>
@@ -511,7 +511,7 @@ function PurchaseForm({
           <textarea {...register('notes')} rows={2} className={inputCls} placeholder="N° facture, conditions..." />
         </Field>
 
-        <div className="flex gap-2 justify-end pt-2 border-t border-stone-100">
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
           <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : 'Enregistrer'}</Button>
         </div>

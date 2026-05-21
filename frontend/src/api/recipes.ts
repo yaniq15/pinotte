@@ -9,6 +9,13 @@ export interface RecipeIngredient {
   notes?: string | null
   sort_order?: number
   line_cost?: number | null
+  // Lien dur au catalogue matières (par ID, robuste aux accents/typos)
+  material_id?: number | null
+  // Snapshot du catalogue pour l'affichage (rempli par le backend en GET)
+  material_name?: string | null
+  material_unit?: string | null
+  material_current_stock?: number | string | null
+  material_pmp?: number | string | null
 }
 
 export interface Recipe {

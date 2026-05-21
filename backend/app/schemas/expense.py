@@ -10,6 +10,8 @@ class CategoryRead(BaseModel):
     id: int
     name: str
     description: Optional[str]
+    account_code: Optional[str] = None
+    expense_type: str = "OPEX"
 
 
 class ExpenseBase(BaseModel):
@@ -22,6 +24,17 @@ class ExpenseBase(BaseModel):
     vendor: Optional[str] = Field(None, max_length=200)
     description: str = Field(..., min_length=1)
     receipt_url: Optional[str] = Field(None, max_length=500)
+    # Taxes payées (récupérables comme CTI/RTI)
+    tps_paid: Optional[Decimal] = Field(None, ge=0)
+    tvq_paid: Optional[Decimal] = Field(None, ge=0)
+    vendor_tps_number: Optional[str] = Field(None, max_length=30)
+    vendor_tvq_number: Optional[str] = Field(None, max_length=30)
+    # Type comptable (override sur la catégorie). None → hérite de category.expense_type
+    expense_type: Optional[str] = Field(None, pattern="^(COGS|OPEX|CAPEX)$")
+    is_recurring: bool = False
+    recurrence_frequency: Optional[str] = Field(None, pattern="^(monthly|quarterly|yearly)$")
+    cca_class: Optional[str] = Field(None, max_length=5)
+    deductibility_pct: int = Field(100, ge=0, le=100)
 
 
 class ExpenseCreate(ExpenseBase):
@@ -36,6 +49,15 @@ class ExpenseUpdate(BaseModel):
     vendor: Optional[str] = None
     description: Optional[str] = None
     receipt_url: Optional[str] = None
+    tps_paid: Optional[Decimal] = Field(None, ge=0)
+    tvq_paid: Optional[Decimal] = Field(None, ge=0)
+    vendor_tps_number: Optional[str] = Field(None, max_length=30)
+    vendor_tvq_number: Optional[str] = Field(None, max_length=30)
+    expense_type: Optional[str] = None
+    is_recurring: Optional[bool] = None
+    recurrence_frequency: Optional[str] = None
+    cca_class: Optional[str] = None
+    deductibility_pct: Optional[int] = Field(None, ge=0, le=100)
 
 
 class ExpenseRead(ExpenseBase):

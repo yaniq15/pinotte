@@ -44,7 +44,7 @@ export default function ClientsPage() {
   })
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-7xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
         title="Clients"
         description="Courtiers (avec taux de distribution) et magasins direct."
@@ -59,7 +59,7 @@ export default function ClientsPage() {
         <div className="p-4 flex items-center gap-3 flex-wrap">
           <label className="text-xs font-medium text-stone-600">Type</label>
           <select value={filterType} onChange={e => setFilterType(e.target.value)}
-            className="px-3 py-1.5 ring-1 ring-stone-200 bg-white rounded-lg text-sm">
+            className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
             <option value="">Tous</option>
             <option value="BROKER">Courtiers</option>
             <option value="STORE">Magasins</option>
@@ -89,7 +89,7 @@ export default function ClientsPage() {
                 </thead>
                 <tbody>
                   {clients.map(c => (
-                    <tr key={c.id} className={`border-t border-stone-100 hover:bg-stone-50 transition ${!c.active && 'opacity-50'}`}>
+                    <tr key={c.id} className={`border-t border-stone-200 hover:bg-stone-50 transition ${!c.active && 'opacity-50'}`}>
                       <td className="px-5 py-3 font-medium text-stone-900">{c.name}</td>
                       <td className="px-5 py-3">
                         <Badge tone={c.type === 'BROKER' ? 'info' : 'paprika'}>
@@ -207,7 +207,7 @@ function ClientForm({ initial, onClose, onSaved }: {
             <input type="number" step="0.01" min="0" max="1" {...register('distribution_rate_pct')}
               className={inputCls} placeholder="0.18" />
             <p className="mt-1 text-[11px] text-stone-500">
-              Ce taux est retiré du prix magasin pour calculer ce que Chika reçoit. Ex: prix magasin 6,49 $ − 18 % = 5,32 $.
+              Ce taux est retiré du prix magasin pour calculer ce que tu reçois. Ex: prix magasin 6,49 $ − 18 % = 5,32 $.
             </p>
           </Field>
         )}
@@ -224,7 +224,7 @@ function ClientForm({ initial, onClose, onSaved }: {
           <input type="checkbox" {...register('active')} className="accent-chika-paprika" /> Client actif
         </label>
 
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-100">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200">
           {isEdit && <Button type="button" variant="danger" size="sm" onClick={onDelete}>Supprimer</Button>}
           <div className="flex gap-2 ml-auto">
             <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>

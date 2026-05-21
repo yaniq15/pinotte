@@ -61,10 +61,10 @@ export default function ProductsPage() {
   const [expanded, setExpanded] = useState<number | null>(null)
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-7xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
         title="Produits"
-        description="Catalogue Chika — structure de prix complète (PDS → marge magasin → distribution)."
+        description="Catalogue — structure de prix complète (PDS → marge magasin → distribution)."
         action={
           <Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>
             Nouveau produit
@@ -102,7 +102,7 @@ export default function ProductsPage() {
                     const caisseValue = costNet !== null ? costNet * upb : null
                     return (
                       <Fragment key={p.id}>
-                        <tr className={`border-t border-stone-100 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
+                        <tr className={`border-t border-stone-200 hover:bg-stone-50 transition ${!p.active && 'opacity-50'}`}>
                           <td className="px-5 py-3">
                             <button onClick={() => setExpanded(isOpen ? null : p.id)}
                               className="text-stone-400 hover:text-stone-700">
@@ -140,7 +140,7 @@ export default function ProductsPage() {
                           </td>
                         </tr>
                         {isOpen && (
-                          <tr className="bg-chika-creamSoft/40 border-t border-stone-100">
+                          <tr className="bg-chika-creamSoft/40 border-t border-stone-200">
                             <td></td>
                             <td colSpan={8} className="px-5 py-4">
                               <PricingBreakdown product={p} costNetCaisse={caisseValue} />
@@ -190,7 +190,7 @@ function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; cos
       <Step
         label={`Moins distribution${brokerPctReal !== null ? ` ${brokerPctReal}%` : ''}`}
         value={fmtCAD(p.price_broker)}
-        sub="= Cost net distributeur (ce que reçoit Chika via BROKER)"
+        sub="= Cost net distributeur (ce que tu reçois via BROKER)"
         highlight
       />
       <Step
@@ -204,7 +204,7 @@ function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; cos
 
 function Step({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
   return (
-    <div className={`bg-white rounded-lg p-3 ring-1 ${highlight ? 'ring-chika-paprika/40' : 'ring-stone-200'}`}>
+    <div className={`bg-white rounded-lg p-3 ring-1 ${highlight ? 'ring-chika-paprika/40' : 'ring-stone-300'}`}>
       <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{label}</div>
       <div className={`text-xl font-bold tabular-nums mt-1 ${highlight ? 'text-chika-paprika' : 'text-stone-900'}`}>{value}</div>
       <div className="text-[10px] text-stone-500 mt-1">{sub}</div>
@@ -422,7 +422,7 @@ function ProductForm({ initial, onClose, onSaved }: {
           )}
 
           {previewUrl && (
-            <div className="mt-2 p-2 bg-stone-50 rounded-lg ring-1 ring-stone-200 flex items-center gap-3">
+            <div className="mt-2 p-2 bg-stone-50 rounded-lg ring-1 ring-stone-300 flex items-center gap-3">
               <img src={previewUrl.startsWith('blob:') ? previewUrl : (resolveImageUrl(previewUrl) ?? previewUrl)}
                 alt="Aperçu" className="w-16 h-16 object-cover rounded"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -433,7 +433,7 @@ function ProductForm({ initial, onClose, onSaved }: {
           )}
         </div>
 
-        <div className="space-y-2 border-t border-stone-100 pt-3">
+        <div className="space-y-2 border-t border-stone-200 pt-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" {...register('active')} className="accent-chika-paprika" />
             <span>Produit actif</span>
@@ -449,7 +449,7 @@ function ProductForm({ initial, onClose, onSaved }: {
           </label>
         </div>
 
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-100">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200">
           {isEdit && (
             <Button type="button" variant="danger" size="sm" onClick={onDelete}>Supprimer</Button>
           )}

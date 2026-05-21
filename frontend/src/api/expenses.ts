@@ -17,6 +17,10 @@ export interface Expense {
   vendor: string | null
   description: string
   receipt_url: string | null
+  tps_paid: number | string | null
+  tvq_paid: number | string | null
+  vendor_tps_number: string | null
+  vendor_tvq_number: string | null
   created_at: string
   updated_at: string
   category_name: string | null
@@ -32,6 +36,15 @@ export interface ExpensePayload {
   vendor?: string | null
   description: string
   receipt_url?: string | null
+  tps_paid?: number | null
+  tvq_paid?: number | null
+  vendor_tps_number?: string | null
+  vendor_tvq_number?: string | null
+  expense_type?: 'COGS' | 'OPEX' | 'CAPEX'
+  is_recurring?: boolean
+  recurrence_frequency?: 'monthly' | 'quarterly' | 'yearly'
+  cca_class?: string
+  deductibility_pct?: number
 }
 
 export interface ExpenseFilter {

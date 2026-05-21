@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import BigInteger, Date, ForeignKey, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base, TimestampMixin
@@ -29,8 +30,11 @@ class Event(Base, TimestampMixin):
     registration_fee: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     transport_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     other_costs: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
-    # Coût matières utilisées (entrée manuelle pour MVP — l'user calcule via Inventaire)
+    # Total matières (recalculé = SUM(materials_breakdown[].amount) si breakdown fourni)
     materials_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    # Détail ligne par ligne — [{"label": "Arachides 50kg", "amount": 120.50}, ...]
+    # Permet de tracer les achats "au fur et à mesure" en cours d'événement
+    materials_breakdown: Mapped[Optional[list[dict]]] = mapped_column(JSONB, nullable=True)
 
     # Revenus
     total_revenue: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))

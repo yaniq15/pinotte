@@ -45,7 +45,7 @@ export default function MovementsPage() {
   })
 
   return (
-    <div className="px-6 lg:px-10 py-8 max-w-6xl">
+    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl">
       <PageHeader
         title="Mouvements de stock"
         description="Historique de tous les flux de stock. Pertes et ajustements à saisir manuellement."
@@ -77,7 +77,7 @@ export default function MovementsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
             <tr>
@@ -93,7 +93,7 @@ export default function MovementsPage() {
               const meta = TYPE_META[m.movement_type]
               const Icon = meta.icon
               return (
-                <tr key={m.id} className="border-t border-stone-100 hover:bg-stone-50">
+                <tr key={m.id} className="border-t border-stone-200 hover:bg-stone-50">
                   <td className="px-4 py-3 text-stone-700">{fmtDate(m.movement_date)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${meta.cls}`}>
@@ -160,7 +160,7 @@ function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form onClick={e => e.stopPropagation()}
         onSubmit={handleSubmit(v => mut.mutate(v))}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-stone-900">Nouveau mouvement</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>

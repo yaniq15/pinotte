@@ -22,9 +22,15 @@ def get_recipe(db: Session, product: Product) -> RecipeOut:
         if line is not None:
             total += line
             any_priced = True
+        # Données de la matière liée (si lien actif) pour l'affichage UI
+        m = ing.material
         items.append(IngredientOut.model_validate({
-            **ing.__dict__,
+            **{k: v for k, v in ing.__dict__.items() if not k.startswith("_")},
             "line_cost": line,
+            "material_name": m.name if m else None,
+            "material_unit": m.unit if m else None,
+            "material_current_stock": m.current_stock if m else None,
+            "material_pmp": m.weighted_avg_price if m else None,
         }))
     cost_per_unit: Optional[Decimal] = None
     cost_per_box: Optional[Decimal] = None
@@ -58,6 +64,7 @@ def put_recipe(db: Session, product: Product, payload: RecipePut) -> Product:
             unit_price=ing.unit_price,
             notes=ing.notes,
             sort_order=ing.sort_order if ing.sort_order else i,
+            material_id=ing.material_id,
         ))
     db.commit()
     db.refresh(product)
