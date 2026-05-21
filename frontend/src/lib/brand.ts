@@ -1,11 +1,15 @@
 /**
- * Brand identity for Chika. Single source of truth for colors, assets, etc.
- * Colors sampled from official assets in design_chika/.
+ * Brand identity du SaaS Pinotte (plateforme white-label).
+ * `name` / `tagline` = identité de la PLATEFORME (vue dans login, sidebar, footer).
+ * `assets` + `products` = données du TENANT par défaut (Chika, le premier client interne).
+ *   Une fois le SaaS vendu, ces assets devraient migrer dans une config tenant par compte.
+ * Palette de couleurs : tokens Tailwind `chika-*` conservés tels quels (les renommer
+ *   serait un refactor lourd pour zéro gain fonctionnel — c'est juste la palette Pinotte).
  */
 export const BRAND = {
-  name: 'Chika',
-  tagline: 'Mets traditionnels africains',
-  taglineEn: 'Traditional African foods',
+  name: 'Pinotte',
+  tagline: 'L\'OS de votre entreprise alimentaire',
+  taglineEn: 'The OS for your food business',
 
   colors: {
     paprika:      '#C5532E',  // primary — package paprika

@@ -13,6 +13,89 @@ body {
   color: #4A2218;
 }
 
+/* ────────── Premium effects (login & marketing pages) ────────── */
+
+/* Mesh gradient animé : 4 orbes flous qui dérivent lentement.
+   On utilise des pseudo-éléments + transform pour rester GPU-accelerated. */
+@keyframes mesh-drift-a {
+  0%, 100% { transform: translate3d(0%, 0%, 0) scale(1); }
+  33%      { transform: translate3d(8%, -6%, 0) scale(1.1); }
+  66%      { transform: translate3d(-5%, 8%, 0) scale(0.95); }
+}
+@keyframes mesh-drift-b {
+  0%, 100% { transform: translate3d(0%, 0%, 0) scale(1); }
+  50%      { transform: translate3d(-10%, 5%, 0) scale(1.15); }
+}
+@keyframes mesh-drift-c {
+  0%, 100% { transform: translate3d(0%, 0%, 0) scale(1.05); }
+  50%      { transform: translate3d(6%, 7%, 0) scale(0.9); }
+}
+
+/* Shimmer métallique qui traverse un élément (titre, logo). */
+@keyframes shine-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.text-shimmer {
+  background: linear-gradient(
+    100deg,
+    #F7E9C5 0%,
+    #ffffff 35%,
+    #FAD5A8 50%,
+    #ffffff 65%,
+    #F7E9C5 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine-sweep 7s linear infinite;
+}
+
+/* Float très lent — pour cards mockup */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
+.animate-float-slow-delay { animation: float-slow 9s ease-in-out infinite; animation-delay: 1.5s; }
+
+/* Glass-morphism card (backdrop-blur + ring + highlight top) */
+.glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 20px 60px -10px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(74, 34, 24, 0.14);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 24px 70px -12px rgba(74, 34, 24, 0.25),
+    0 0 0 1px rgba(74, 34, 24, 0.10);
+}
+
+/* Mirror reflection — pour le logo */
+.mirror::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -22px 0;
+  height: 22px;
+  background: linear-gradient(to bottom, currentColor 0%, transparent 100%);
+  opacity: 0.18;
+  transform: scaleY(-1);
+  mask-image: linear-gradient(to bottom, black, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  pointer-events: none;
+}
+
 /* Chika motif as a tile-able background. Reuse on any element with .bg-motif-* */
 .bg-motif-paprika {
   background-image: url('/brand/motif-paprika.jpg');
@@ -35,4 +118,101 @@ body {
   background-repeat: repeat;
   opacity: 0.08;
   pointer-events: none;
+}
+
+/* ====== Étiquettes de lot (impression) ====== */
+.labels-grid-small {
+  display: grid;
+  grid-template-columns: repeat(3, 64mm);
+  grid-auto-rows: 33.8mm;
+  gap: 2mm;
+  justify-content: center;
+}
+.labels-grid-large {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: 130mm;
+  gap: 8mm;
+  justify-content: center;
+}
+.label-card {
+  border: 1px dashed #b9a89a;
+  border-radius: 4mm;
+  background: #fff;
+  color: #4A2218;
+  padding: 3mm 4mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  overflow: hidden;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.label-small { font-size: 8pt; }
+.label-large { font-size: 14pt; padding: 10mm 12mm; }
+.label-brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: #B85C3A;
+  font-size: 1em;
+}
+.label-large .label-brand { font-size: 1.4em; }
+.label-product {
+  font-weight: 700;
+  font-size: 1.05em;
+  line-height: 1.15;
+  margin-top: 1mm;
+}
+.label-large .label-product { font-size: 1.6em; margin-top: 4mm; }
+.label-lot {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  margin-top: 1mm;
+}
+.label-large .label-lot { margin-top: 4mm; }
+.label-lotnum {
+  font-family: 'Inter', monospace;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-size: 1.2em;
+}
+.label-large .label-lotnum { font-size: 1.8em; }
+.label-dates {
+  display: flex;
+  justify-content: space-between;
+  gap: 3mm;
+  margin-top: 1mm;
+}
+.label-large .label-dates { margin-top: 6mm; gap: 8mm; }
+.label-key {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a7a6e;
+}
+.label-large .label-key { font-size: 0.65em; }
+.label-date {
+  font-weight: 700;
+  font-size: 0.95em;
+}
+.label-large .label-date { font-size: 1.2em; }
+.label-expiring { color: #c97a1a; }
+.label-expired { color: #b3261e; text-decoration: line-through; }
+
+@media print {
+  @page { size: A4; margin: 6mm; }
+  body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    background: #fff;
+  }
+  .no-print, .no-print * { display: none !important; }
+  .label-card { border: 1px dashed #999; }
 }

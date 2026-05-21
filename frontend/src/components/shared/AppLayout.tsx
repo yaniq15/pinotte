@@ -1,39 +1,48 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout,
+  LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout, PartyPopper,
+  ClipboardCheck, Building2, RefreshCcw, Factory, LineChart,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useCurrentUser, clearToken } from '../../hooks/useAuth'
 import { BRAND } from '../../lib/brand'
-import { useLang } from '../../lib/i18n'
+import { useLang, useT } from '../../lib/i18n'
+import { PinotteWordmark } from '../../pages/LoginPage'
 
 interface NavItem {
   to: string
-  label: string
+  labelKey: string
   icon: React.ComponentType<{ size?: number; className?: string }>
-  section?: string
+  sectionKey: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/',           label: 'Tableau de bord', icon: Home,           section: 'Aperçu' },
-  { to: '/produits',   label: 'Produits',        icon: Package,        section: 'Catalogue' },
-  { to: '/lots',       label: 'Lots',            icon: Boxes,          section: 'Catalogue' },
-  { to: '/calculateur',label: 'Calculateur',     icon: Calculator,     section: 'Catalogue' },
-  { to: '/matieres',   label: 'Matières prem.',  icon: Sprout,         section: 'Catalogue' },
-  { to: '/inventaire', label: 'Inventaire',      icon: Warehouse,      section: 'Catalogue' },
-  { to: '/mouvements', label: 'Mouvements',      icon: ArrowLeftRight, section: 'Catalogue' },
-  { to: '/clients',    label: 'Clients',         icon: Users,          section: 'Ventes' },
-  { to: '/ventes',     label: 'Ventes',          icon: Receipt,        section: 'Ventes' },
-  { to: '/depenses',   label: 'Dépenses',        icon: Wallet,         section: 'Finance' },
-  { to: '/profil',     label: 'Profil',          icon: Settings,       section: 'Compte' },
+  { to: '/',           labelKey: 'nav.dashboard',  icon: Home,           sectionKey: 'nav.section.overview' },
+  { to: '/produits',   labelKey: 'nav.products',   icon: Package,        sectionKey: 'nav.section.catalog' },
+  { to: '/lots',       labelKey: 'nav.batches',    icon: Boxes,          sectionKey: 'nav.section.catalog' },
+  { to: '/calculateur',labelKey: 'nav.calculator', icon: Calculator,     sectionKey: 'nav.section.catalog' },
+  { to: '/matieres',   labelKey: 'nav.materials',  icon: Sprout,         sectionKey: 'nav.section.catalog' },
+  { to: '/inventaire', labelKey: 'nav.inventory',  icon: Warehouse,      sectionKey: 'nav.section.catalog' },
+  { to: '/inventaire-physique', labelKey: 'nav.inventory_count', icon: ClipboardCheck, sectionKey: 'nav.section.catalog' },
+  { to: '/mouvements', labelKey: 'nav.movements',  icon: ArrowLeftRight, sectionKey: 'nav.section.catalog' },
+  { to: '/clients',    labelKey: 'nav.clients',    icon: Users,          sectionKey: 'nav.section.sales' },
+  { to: '/ventes',     labelKey: 'nav.sales',      icon: Receipt,        sectionKey: 'nav.section.sales' },
+  { to: '/evenements', labelKey: 'nav.events',     icon: PartyPopper,    sectionKey: 'nav.section.sales' },
+  { to: '/comptes-a-recevoir', labelKey: 'nav.ar_aging', icon: Wallet,    sectionKey: 'nav.section.sales' },
+  { to: '/depenses',   labelKey: 'nav.expenses',   icon: Wallet,         sectionKey: 'nav.section.finance' },
+  { to: '/abonnements', labelKey: 'nav.subscriptions', icon: RefreshCcw, sectionKey: 'nav.section.finance' },
+  { to: '/immobilisations', labelKey: 'nav.fixed_assets', icon: Factory, sectionKey: 'nav.section.finance' },
+  { to: '/simulateur', labelKey: 'nav.simulator',  icon: LineChart,      sectionKey: 'nav.section.finance' },
+  { to: '/profil',     labelKey: 'nav.profile',    icon: Settings,       sectionKey: 'nav.section.account' },
 ]
 
 export default function AppLayout() {
   const { data: user } = useCurrentUser()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const t = useT()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   function logout() {
@@ -45,12 +54,11 @@ export default function AppLayout() {
   const initials = (user?.name || '?').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase()
 
   // Group items by section for the sidebar
-  const sections: { name: string; items: NavItem[] }[] = []
+  const sections: { key: string; items: NavItem[] }[] = []
   for (const item of NAV_ITEMS) {
-    const sec = item.section || 'Autre'
-    let group = sections.find(s => s.name === sec)
+    let group = sections.find(s => s.key === item.sectionKey)
     if (!group) {
-      group = { name: sec, items: [] }
+      group = { key: item.sectionKey, items: [] }
       sections.push(group)
     }
     group.items.push(item)
@@ -60,9 +68,9 @@ export default function AppLayout() {
     <div className="min-h-screen flex bg-stone-50">
       {/* SIDEBAR — desktop */}
       <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-stone-200/80 shrink-0">
-        {/* Brand */}
-        <div className="px-5 py-5 border-b border-stone-100">
-          <img src={BRAND.assets.logoPaprika} alt={BRAND.name} className="h-7" />
+        {/* Brand — wordmark texte Pinotte (la plateforme), pas le logo Chika (tenant) */}
+        <div className="px-5 py-5 border-b border-stone-200">
+          <PinotteWordmark size="md" />
           <div className="text-[10px] uppercase tracking-widest text-stone-400 mt-1.5">
             {BRAND.tagline}
           </div>
@@ -71,12 +79,12 @@ export default function AppLayout() {
         {/* Nav grouped by sections */}
         <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
           {sections.map(sec => (
-            <div key={sec.name}>
+            <div key={sec.key}>
               <div className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-400">
-                {sec.name}
+                {t(sec.key)}
               </div>
               <div className="space-y-0.5">
-                {sec.items.map(({ to, label, icon: Icon }) => (
+                {sec.items.map(({ to, labelKey, icon: Icon }) => (
                   <NavLink key={to} to={to} end={to === '/'}
                     className={({ isActive }) =>
                       `flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition ${
@@ -85,7 +93,7 @@ export default function AppLayout() {
                           : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
                       }`}>
                     <Icon size={15} />
-                    {label}
+                    {t(labelKey)}
                   </NavLink>
                 ))}
               </div>
@@ -94,7 +102,7 @@ export default function AppLayout() {
         </nav>
 
         {/* User card */}
-        <div className="p-3 border-t border-stone-100 relative">
+        <div className="p-3 border-t border-stone-200 relative">
           <button onClick={() => setUserMenuOpen(v => !v)}
             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-stone-100 transition">
             <div className="w-8 h-8 rounded-full bg-chika-paprika text-white flex items-center justify-center text-xs font-bold shrink-0">
@@ -107,11 +115,11 @@ export default function AppLayout() {
             <ChevronDown size={14} className={`text-stone-400 transition ${userMenuOpen ? 'rotate-180' : ''}`} />
           </button>
           {userMenuOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-1 bg-white rounded-lg ring-1 ring-stone-200 shadow-lg overflow-hidden">
+            <div className="absolute bottom-full left-3 right-3 mb-1 bg-white rounded-lg ring-1 ring-stone-300 shadow-lg overflow-hidden">
               <LangToggle />
               <button onClick={logout}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-stone-700 hover:bg-red-50 hover:text-red-700 transition border-t border-stone-100">
-                <LogOut size={14} /> Se déconnecter / Logout
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-stone-700 hover:bg-red-50 hover:text-red-700 transition border-t border-stone-200">
+                <LogOut size={14} /> {t('action.logout')}
               </button>
             </div>
           )}
@@ -123,14 +131,14 @@ export default function AppLayout() {
         {/* MOBILE TOP BAR */}
         <header className="lg:hidden bg-white border-b border-stone-200">
           <div className="px-4 py-3 flex items-center justify-between">
-            <img src={BRAND.assets.logoPaprika} alt={BRAND.name} className="h-7" />
+            <PinotteWordmark size="sm" />
             <button onClick={logout}
               className="flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50">
-              <LogOut size={14} /> Sortir
+              <LogOut size={14} /> {t('action.logout', 'Sortir')}
             </button>
           </div>
           <nav className="px-2 pb-2 flex gap-1 overflow-x-auto">
-            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
               <NavLink key={to} to={to} end={to === '/'}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
@@ -138,7 +146,7 @@ export default function AppLayout() {
                       ? 'bg-chika-paprika text-white'
                       : 'text-stone-600 bg-stone-100'
                   }`}>
-                <Icon size={14} /> {label}
+                <Icon size={14} /> {t(labelKey)}
               </NavLink>
             ))}
           </nav>
@@ -163,7 +171,7 @@ export function PageHeader({
   action?: ReactNode
   breadcrumbs?: { label: string; to?: string }[]
 }) {
-  const crumbs = breadcrumbs || [{ label: 'Chika' }, { label: title }]
+  const crumbs = breadcrumbs || [{ label: BRAND.name }, { label: title }]
   return (
     <div className="mb-6">
       <nav className="flex items-center gap-1.5 text-xs text-stone-500 mb-2">
@@ -192,7 +200,7 @@ function LangToggle() {
   return (
     <div className="flex items-center justify-between gap-2 px-3 py-2 text-[12px] text-stone-600">
       <span className="font-medium">Langue / Language</span>
-      <div className="inline-flex rounded-md ring-1 ring-stone-200 overflow-hidden">
+      <div className="inline-flex rounded-md ring-1 ring-stone-300 overflow-hidden">
         <button onClick={() => setLang('fr')}
           className={`px-2 py-0.5 text-[11px] font-semibold ${lang === 'fr' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-600 hover:bg-stone-50'}`}>FR</button>
         <button onClick={() => setLang('en')}
