@@ -547,6 +547,40 @@ def alerts(
     items: list[AlertItem] = []
     today = date.today()
 
+    # 0) Bénéfice net négatif ce mois — le signal le plus important.
+    #    Import local pour éviter l'import circulaire reports <-> pme.
+    try:
+        from .reports import monthly_report
+        report = monthly_report(year=today.year, month=today.month, db=db)  # type: ignore[call-arg]
+        net = float(report.get("net_profit") or 0)
+        isr = report.get("income_statement") or {}
+        revenue = float(isr.get("revenue") or 0)
+        if net < 0 and revenue > 0:
+            items.append(AlertItem(
+                severity="critical",
+                category="net_profit",
+                title=f"Tu perds de l'argent ce mois : {net:.0f} $",
+                description=(
+                    "Tes revenus ne couvrent pas le coût de production + les frais "
+                    "d'exploitation. Regarde l'État des résultats : il faut soit vendre "
+                    "plus de volume, soit monter tes prix, soit réduire tes coûts."
+                ),
+                action_label="Voir l'état des résultats",
+                action_url="/",
+            ))
+        elif net < 0:
+            # Pas de revenus mais des dépenses → on dépense sans rentrée d'argent
+            items.append(AlertItem(
+                severity="warning",
+                category="net_profit",
+                title=f"Dépenses sans revenus ce mois : {net:.0f} $",
+                description="Tu as engagé des dépenses mais aucune vente encaissée ce mois-ci.",
+                action_label="Voir l'état des résultats",
+                action_url="/",
+            ))
+    except Exception:
+        pass  # le moteur d'alertes ne doit jamais planter le dashboard
+
     # 1) Factures à recevoir > 90 jours
     aging = ar_aging(as_of=today, db=db)  # type: ignore[arg-type]
     if aging.totals.days_90_plus > 0:
