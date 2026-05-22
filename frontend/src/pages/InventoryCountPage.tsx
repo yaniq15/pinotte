@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X } from 'lucide-react'
 import { listInventoryCounts, createInventoryCount } from '../api/pme'
@@ -94,7 +95,7 @@ export default function InventoryCountPage() {
 function CountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [productId, setProductId] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(todayISO())
   const [physical, setPhysical] = useState('')
   const [notes, setNotes] = useState('')
 

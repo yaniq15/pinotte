@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -129,7 +130,7 @@ export default function MovementsPage() {
 function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [serverError, setServerError] = useState<string | null>(null)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,

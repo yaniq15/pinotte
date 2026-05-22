@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
+import { todayISO, fmtDateLocal } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, X, Trash2 } from 'lucide-react'
+import { Plus, X, Trash2, Pencil, RefreshCcw, CheckCircle2 } from 'lucide-react'
 import {
-  listExpenses, listCategories, createExpense, deleteExpense,
+  listExpenses, listCategories, createExpense, updateExpense, deleteExpense,
+  listRecurringTemplates, applyRecurringExpenses,
   type Expense, type ExpensePayload,
 } from '../api/expenses'
 import { listProducts } from '../api/products'
@@ -35,8 +37,8 @@ const fmtCAD = (v: number | string) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' })
     .format(typeof v === 'string' ? parseFloat(v) : v)
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
+// Affichage sans décalage de fuseau (parse "YYYY-MM-DD" en local)
+const fmtDate = (iso: string) => fmtDateLocal(iso)
 
 export default function ExpensesPage() {
   const qc = useQueryClient()
@@ -49,6 +51,7 @@ export default function ExpensesPage() {
   )
   const [filterYear, setFilterYear] = useState<string>(String(today.getFullYear()))
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Expense | null>(null)
 
   const categories = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
@@ -99,7 +102,7 @@ export default function ExpensesPage() {
         title="Dépenses"
         description="Suivi des dépenses catégorisées avec totaux et liens optionnels aux produits/lots."
         action={
-          <button onClick={() => setShowForm(true)}
+          <button onClick={() => { setEditing(null); setShowForm(true) }}
             className="inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
             <Plus size={16} /> Nouvelle dépense
           </button>
@@ -166,6 +169,9 @@ export default function ExpensesPage() {
         </div>
       </div>
 
+      {/* Dépenses récurrentes — bouton "appliquer au mois courant" */}
+      <RecurringExpensesPanel />
+
       <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
@@ -192,12 +198,16 @@ export default function ExpensesPage() {
                 <td className="px-4 py-3 text-stone-600 hidden sm:table-cell">{e.vendor || '—'}</td>
                 <td className="px-4 py-3 text-stone-600 hidden md:table-cell">{e.product_name || '—'}</td>
                 <td className="px-4 py-3 text-right tabular-nums font-bold text-red-600">−{fmtCAD(e.amount)}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <button onClick={() => { setEditing(e); setShowForm(true) }}
+                    className="text-stone-400 hover:text-chika-paprika p-1" title="Modifier">
+                    <Pencil size={14} />
+                  </button>
                   <button onClick={() => {
                     if (window.confirm('Supprimer cette dépense ?')) {
                       deleteExpense(e.id).then(() => qc.invalidateQueries({ queryKey: ['expenses'] }))
                     }
-                  }} className="text-stone-400 hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                  }} className="text-stone-400 hover:text-red-600 p-1" title="Supprimer"><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
@@ -209,25 +219,57 @@ export default function ExpensesPage() {
       </div>
 
       {showForm && (
-        <ExpenseForm onClose={() => setShowForm(false)} onSaved={() => {
-          qc.invalidateQueries({ queryKey: ['expenses'] })
-          setShowForm(false)
-        }} />
+        <ExpenseForm
+          initial={editing}
+          onClose={() => { setShowForm(false); setEditing(null) }}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['expenses'] })
+            setShowForm(false)
+            setEditing(null)
+          }}
+        />
       )}
     </div>
   )
 }
 
-function ExpenseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function ExpenseForm({ initial, onClose, onSaved }: {
+  initial: Expense | null
+  onClose: () => void
+  onSaved: () => void
+}) {
   const categories = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [serverError, setServerError] = useState<string | null>(null)
-  const [accountingOpen, setAccountingOpen] = useState(false)
-  const today = new Date().toISOString().slice(0, 10)
+  const isEdit = !!initial
+  // Ouvre la section comptable d'emblée si la dépense éditée a déjà des taxes/type
+  const [accountingOpen, setAccountingOpen] = useState(
+    !!(initial && (initial.tps_paid || initial.tvq_paid || initial.expense_type || initial.is_recurring)),
+  )
+  const today = todayISO()
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
-    defaultValues: { expense_date: today, amount: 0 },
+    defaultValues: initial
+      ? {
+          category_id: initial.category_id,
+          product_id: initial.product_id ? String(initial.product_id) : '',
+          amount: Number(initial.amount),
+          expense_date: initial.expense_date.slice(0, 10),
+          vendor: initial.vendor || '',
+          description: initial.description,
+          receipt_url: initial.receipt_url || '',
+          tps_paid: initial.tps_paid != null ? String(initial.tps_paid) : '',
+          tvq_paid: initial.tvq_paid != null ? String(initial.tvq_paid) : '',
+          vendor_tps_number: initial.vendor_tps_number || '',
+          vendor_tvq_number: initial.vendor_tvq_number || '',
+          expense_type: (initial.expense_type as FormData['expense_type']) || '',
+          is_recurring: initial.is_recurring ?? false,
+          recurrence_frequency: (initial.recurrence_frequency as FormData['recurrence_frequency']) || '',
+          cca_class: initial.cca_class || '',
+          deductibility_pct: initial.deductibility_pct ?? 100,
+        }
+      : { expense_date: today, amount: 0 },
   })
 
   const mut = useMutation({
@@ -250,7 +292,7 @@ function ExpenseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         cca_class: v.cca_class || undefined,
         deductibility_pct: v.deductibility_pct !== undefined ? Number(v.deductibility_pct) : 100,
       }
-      return createExpense(payload)
+      return isEdit ? updateExpense(initial!.id, payload) : createExpense(payload)
     },
     onSuccess: onSaved,
     onError: (err: unknown) => {
@@ -265,7 +307,7 @@ function ExpenseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Nouvelle dépense</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier la dépense' : 'Nouvelle dépense'}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
@@ -401,6 +443,118 @@ function Field({ label, error, children }: { label: string; error?: string; chil
       <label className="block text-xs font-semibold text-stone-600 mb-1">{label}</label>
       {children}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+const MONTHS_FR = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+]
+
+/**
+ * Panneau "Dépenses récurrentes" — liste les abonnements mensuels et permet
+ * de les appliquer en un clic au mois courant (loyer, abonnements logiciels…).
+ */
+function RecurringExpensesPanel() {
+  const qc = useQueryClient()
+  const now = new Date()
+  const [open, setOpen] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const templates = useQuery({
+    queryKey: ['recurring-templates'],
+    queryFn: listRecurringTemplates,
+  })
+
+  const apply = useMutation({
+    mutationFn: () => applyRecurringExpenses(now.getFullYear(), now.getMonth() + 1),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+      if (r.created === 0 && r.skipped > 0) {
+        setResult(`Tout est déjà à jour — ${r.skipped} dépense(s) déjà présente(s) ce mois-ci.`)
+      } else {
+        setResult(`✅ ${r.created} dépense(s) ajoutée(s) pour ${MONTHS_FR[now.getMonth()]} ${now.getFullYear()}` +
+          (r.skipped > 0 ? ` · ${r.skipped} déjà présente(s), ignorée(s).` : '.'))
+      }
+      setTimeout(() => setResult(null), 6000)
+    },
+  })
+
+  const items = templates.data ?? []
+  const totalMonthly = items.reduce((s, e) => s + (typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount), 0)
+
+  return (
+    <div className="bg-white rounded-2xl border border-stone-200 mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <RefreshCcw size={16} className="text-chika-paprika" />
+          <span className="text-sm font-semibold text-stone-900">
+            Dépenses récurrentes
+          </span>
+          {items.length > 0 && (
+            <span className="text-xs bg-chika-paprika/10 text-chika-paprika font-bold px-2 py-0.5 rounded-full">
+              {items.length}
+            </span>
+          )}
+        </div>
+        <span className="text-stone-400 text-sm">{open ? '−' : '+'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4 border-t border-stone-200 pt-3 space-y-3">
+          {items.length === 0 ? (
+            <p className="text-sm text-stone-500 italic">
+              Aucune dépense récurrente mensuelle. Pour en créer une : nouvelle dépense → section
+              « Détails comptables » → coche « Dépense récurrente » + fréquence « Mensuel ».
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-stone-500">
+                Ces dépenses reviennent chaque mois (loyer, abonnements…). Clique le bouton pour
+                les ajouter d'un coup au mois courant — sans ressaisir.
+              </p>
+              <ul className="space-y-1.5">
+                {items.map(e => (
+                  <li key={e.id} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 last:border-0">
+                    <span className="text-stone-700">
+                      <span className="font-medium">{e.description}</span>
+                      {e.vendor && <span className="text-stone-400"> · {e.vendor}</span>}
+                    </span>
+                    <span className="tabular-nums font-semibold text-stone-900">{fmtCAD(e.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-stone-500">
+                  Total mensuel : <strong className="text-stone-900">{fmtCAD(totalMonthly)}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => apply.mutate()}
+                  disabled={apply.isPending}
+                  className="inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm"
+                >
+                  <RefreshCcw size={14} />
+                  {apply.isPending
+                    ? '…'
+                    : `Appliquer à ${MONTHS_FR[now.getMonth()]} ${now.getFullYear()}`}
+                </button>
+              </div>
+            </>
+          )}
+          {result && (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded-lg px-3 py-2">
+              <CheckCircle2 size={14} className="shrink-0" />
+              {result}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Plus, X, ShoppingCart, AlertTriangle, Trash2, Pencil } from 'lucide-react'
@@ -388,7 +389,7 @@ function PurchaseForm({
   onClose: () => void
   onSaved: () => void
 }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<PurchaseFormData>({
     defaultValues: {
       material_id: defaultMaterialId ?? '',

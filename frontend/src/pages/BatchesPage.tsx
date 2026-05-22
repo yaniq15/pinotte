@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -136,7 +137,7 @@ function BatchForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
     defaultValues: { production_date: today, quantity_boxes: 2, total_cost: 0 },

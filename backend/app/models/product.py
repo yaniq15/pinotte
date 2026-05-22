@@ -44,6 +44,10 @@ class Product(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Code GS1 — GTIN-13/14 numérique. Pinotte génère le code-barres EAN-13.
+    gtin: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
+    # Image de code-barres uploadée — alternative au GTIN généré.
+    barcode_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Au Québec, l'épicerie de base (légumes, viande, sauces alimentaires...)
     # est DÉTAXÉE. taxable=False → pas de TPS/TVQ sur ce produit en vente.
     taxable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")

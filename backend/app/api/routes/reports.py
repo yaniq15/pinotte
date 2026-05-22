@@ -111,6 +111,28 @@ def monthly_report(
     ).all()
     expenses_by_category = [{"category": name, "total": float(total)} for name, total in expenses_by_cat]
 
+    # 3a. Ventilation des dépenses par type comptable (COGS / OPEX / CAPEX).
+    # Le type effectif = expense.expense_type, sinon category.expense_type, sinon OPEX.
+    # Sert au vrai état des résultats : seules les OPEX sont des charges de la période.
+    #   - COGS-typées = achats de matières → absorbées dans le coût produit (ne pas recompter)
+    #   - CAPEX-typées = immobilisations → amorties, hors résultat
+    exp_type_rows = db.execute(
+        select(Expense.amount, Expense.expense_type, Category.expense_type.label("cat_type"))
+        .join(Category, Expense.category_id == Category.id)
+        .where(Expense.expense_date.between(start, end))
+    ).all()
+    cogs_expenses = 0.0
+    capex_expenses = 0.0
+    opex_expenses = 0.0
+    for amount, etype, cat_type in exp_type_rows:
+        t = etype or cat_type or "OPEX"
+        if t == "COGS":
+            cogs_expenses += float(amount)
+        elif t == "CAPEX":
+            capex_expenses += float(amount)
+        else:
+            opex_expenses += float(amount)
+
     # 3b. Événements du mois — revenus encaissés sur place + coûts liés
     # (les ventes sur événements ne passent pas par la table Sale, elles sont saisies via Event)
     events_in_month = db.scalars(
@@ -131,8 +153,8 @@ def monthly_report(
         # Re-trier pour garder la cohérence
         expenses_by_category.sort(key=lambda x: x["total"], reverse=True)
 
-    # 4. Net profit (revenue paid − expenses this month, événements inclus)
-    net_profit = revenue_paid - expenses_total
+    # 4. Le net_profit est calculé plus bas (après le COGS, qui vient de la
+    #    boucle de marge par produit) — voir section "État des résultats".
 
     # 5. Sales by product (toutes non-annulées + sous-total PAID seulement)
     sales_by_product_rows = db.execute(
@@ -163,6 +185,7 @@ def monthly_report(
 
     sales_by_product = []
     margin_by_product = []
+    cogs_paid_total = 0.0  # coût de production des produits VENDUS ET PAYÉS ce mois
     for row in sales_by_product_rows:
         boxes = int(row.boxes)
         revenue = float(row.revenue)
@@ -173,6 +196,7 @@ def monthly_report(
         # Marge encaissée (sur ventes PAID seulement)
         rev_paid, boxes_paid = paid_by_pid.get(row.id, (0.0, 0))
         cost_paid = float(boxes_paid * row.units_per_box * (row.unit_cost or 0))
+        cogs_paid_total += cost_paid
         margin_paid = rev_paid - cost_paid
         margin_paid_pct = (margin_paid / rev_paid * 100) if rev_paid else 0
 
@@ -219,6 +243,21 @@ def monthly_report(
                 "stock_boxes": boxes,
             })
 
+    # ── ÉTAT DES RÉSULTATS (vrai bénéfice net) ──────────────────────────────
+    # Revenus → − COGS → = Marge brute → − Frais d'exploitation → = Bénéfice net
+    #
+    # COGS = coût de production des produits vendus & payés ce mois (basé sur
+    #        le coût unitaire des recettes). C'est le "matching principle" :
+    #        on associe le coût à la vente qu'il a générée.
+    # Frais d'exploitation = dépenses OPEX (loyer, transport…) + coûts événements.
+    #        On EXCLUT les dépenses typées COGS (= achats de matières, déjà
+    #        comptées via le coût produit) et CAPEX (= immobilisations amorties).
+    income_revenue = revenue_paid  # inclut déjà events_revenue (folded plus haut)
+    income_cogs = cogs_paid_total
+    gross_margin = income_revenue - income_cogs
+    operating_expenses = opex_expenses + events_cost
+    net_profit = gross_margin - operating_expenses
+
     return {
         "year": year, "month": month,
         "revenue_paid": round(revenue_paid, 2),
@@ -226,6 +265,19 @@ def monthly_report(
         "expenses_total": round(expenses_total, 2),
         "expenses_by_category": expenses_by_category,
         "net_profit": round(net_profit, 2),
+        # État des résultats détaillé (waterfall)
+        "income_statement": {
+            "revenue": round(income_revenue, 2),
+            "cogs": round(income_cogs, 2),
+            "gross_margin": round(gross_margin, 2),
+            "gross_margin_pct": round(gross_margin / income_revenue * 100, 1) if income_revenue else None,
+            "operating_expenses": round(operating_expenses, 2),
+            "net_profit": round(net_profit, 2),
+            "net_profit_pct": round(net_profit / income_revenue * 100, 1) if income_revenue else None,
+            # Postes exclus du résultat (informatif)
+            "cogs_typed_expenses_excluded": round(cogs_expenses, 2),
+            "capex_excluded": round(capex_expenses, 2),
+        },
         "sales_by_product": sales_by_product,
         "margin_by_product": margin_by_product,
         "top_clients": top_clients,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText } from 'lucide-react'
 import { downloadInvoice } from '../components/Invoice'
@@ -193,7 +194,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const clients = useQuery({ queryKey: ['clients', ''], queryFn: () => listClients() })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
   const [clientId, setClientId] = useState('')
   const [saleDate, setSaleDate] = useState(today)
   const [notes, setNotes] = useState('')

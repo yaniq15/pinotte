@@ -21,6 +21,11 @@ export interface Expense {
   tvq_paid: number | string | null
   vendor_tps_number: string | null
   vendor_tvq_number: string | null
+  expense_type: 'COGS' | 'OPEX' | 'CAPEX' | null
+  is_recurring: boolean
+  recurrence_frequency: 'monthly' | 'quarterly' | 'yearly' | null
+  cca_class: string | null
+  deductibility_pct: number | null
   created_at: string
   updated_at: string
   category_name: string | null
@@ -69,6 +74,32 @@ export async function createExpense(payload: ExpensePayload): Promise<Expense> {
   return data
 }
 
+export async function updateExpense(id: number, payload: Partial<ExpensePayload>): Promise<Expense> {
+  const { data } = await api.patch<Expense>(`/api/expenses/${id}`, payload)
+  return data
+}
+
 export async function deleteExpense(id: number): Promise<void> {
   await api.delete(`/api/expenses/${id}`)
+}
+
+// ── Dépenses récurrentes ────────────────────────────────────────
+export async function listRecurringTemplates(): Promise<Expense[]> {
+  const { data } = await api.get<Expense[]>('/api/expenses/recurring/templates')
+  return data
+}
+
+export interface ApplyRecurringResult {
+  created: number
+  skipped: number
+  total_templates: number
+  year: number
+  month: number
+}
+
+export async function applyRecurringExpenses(year: number, month: number): Promise<ApplyRecurringResult> {
+  const { data } = await api.post<ApplyRecurringResult>('/api/expenses/recurring/apply', null, {
+    params: { year, month },
+  })
+  return data
 }

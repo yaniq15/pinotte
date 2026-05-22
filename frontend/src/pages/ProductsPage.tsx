@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, X, ChevronRight } from 'lucide-react'
 import {
-  listProducts, createProduct, updateProduct, deleteProduct, uploadProductImage,
+  listProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, uploadProductBarcode,
   type Product, type ProductPayload,
 } from '../api/products'
 import { resolveImageUrl } from '../lib/axios'
@@ -14,6 +14,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
+import { Barcode } from '../components/ui/Barcode'
 
 // Preprocess: convert empty strings (from <input>) to undefined so .optional() works cleanly.
 const optNum = (max?: number) => {
@@ -35,6 +36,7 @@ const schema = z.object({
   active: z.boolean().default(true),
   image_url: z.string().optional(),
   taxable: z.boolean().default(false),
+  gtin: z.string().optional().or(z.literal('')),
 })
 
 type FormData = z.infer<typeof schema>
@@ -232,8 +234,9 @@ function ProductForm({ initial, onClose, onSaved }: {
           price_direct: initial.price_direct == null ? undefined : Number(initial.price_direct),
           currency: initial.currency, active: initial.active, image_url: initial.image_url ?? '',
           taxable: initial.taxable ?? false,
+          gtin: initial.gtin ?? '',
         }
-      : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35, taxable: false },
+      : { currency: 'CAD', active: true, units_per_box: 10, store_margin_pct: 0.35, taxable: false, gtin: '' },
   })
 
   // Auto-derive direct + broker prices from consumer_price + store_margin_pct
@@ -246,6 +249,25 @@ function ProductForm({ initial, onClose, onSaved }: {
   )
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(initial?.image_url ?? null)
+
+  // Code-barres : fichier image en attente d'upload
+  const [pendingBarcodeFile, setPendingBarcodeFile] = useState<File | null>(null)
+  const [barcodePreview, setBarcodePreview] = useState<string | null>(initial?.barcode_image_url ?? null)
+  function onBarcodeFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type)) {
+      setServerError('Code-barres : type non supporté (jpeg/png/webp/gif)')
+      return
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setServerError('Code-barres : image trop volumineuse (max 5 MB)')
+      return
+    }
+    setPendingBarcodeFile(f)
+    setBarcodePreview(URL.createObjectURL(f))
+    setServerError(null)
+  }
 
   function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -285,13 +307,18 @@ function ProductForm({ initial, onClose, onSaved }: {
         currency: v.currency, active: v.active, taxable: v.taxable,
         // En mode upload, l'URL sera set par l'endpoint upload après création
         image_url: imageMode === 'url' ? (v.image_url || null) : (initial?.image_url ?? null),
+        gtin: v.gtin?.trim() || null,
       }
-      const product = isEdit
+      let product = isEdit
         ? await updateProduct(initial!.id, payload)
         : await createProduct(payload)
-      // Si un fichier est en attente, l'uploader maintenant (set image_url)
+      // Si un fichier image est en attente, l'uploader maintenant (set image_url)
       if (imageMode === 'upload' && pendingFile) {
-        return await uploadProductImage(product.id, pendingFile)
+        product = await uploadProductImage(product.id, pendingFile)
+      }
+      // Si une image de code-barres est en attente, l'uploader aussi
+      if (pendingBarcodeFile) {
+        product = await uploadProductBarcode(product.id, pendingBarcodeFile)
       }
       return product
     },
@@ -431,6 +458,51 @@ function ProductForm({ initial, onClose, onSaved }: {
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── Code-barres GS1 ──────────────────────────────────── */}
+        <div className="space-y-2 border-t border-stone-200 pt-3">
+          <label className="block text-xs font-bold uppercase tracking-wider text-stone-600">
+            Code-barres GS1
+          </label>
+          <Field label="Numéro GTIN (8, 12 ou 13 chiffres)">
+            <input {...register('gtin')} className={`${inputCls} font-mono`}
+              placeholder="Ex: 0627843210019" inputMode="numeric" />
+          </Field>
+          <p className="text-[11px] text-stone-500">
+            Pinotte génère automatiquement le code-barres EAN-13 à partir du numéro.
+          </p>
+          {/* Aperçu code-barres généré */}
+          {(() => {
+            const g = (watch('gtin') || '').replace(/\D/g, '')
+            return g.length >= 8 ? (
+              <div className="p-2 bg-white rounded-lg ring-1 ring-stone-300 flex justify-center">
+                <Barcode value={g} height={36} />
+              </div>
+            ) : null
+          })()}
+
+          {/* Upload image de code-barres (alternative) */}
+          <div className="pt-1">
+            <label className="block text-[11px] font-semibold text-stone-500 mb-1">
+              OU upload ta propre image de code-barres (jpeg/png/webp, max 5 MB)
+            </label>
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={onBarcodeFileSelected}
+              className={`${inputCls} file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 file:text-xs file:font-semibold`} />
+            {pendingBarcodeFile && (
+              <div className="text-[11px] text-stone-500 mt-1">
+                📎 {pendingBarcodeFile.name} · sera uploadé à la sauvegarde
+              </div>
+            )}
+            {barcodePreview && (
+              <div className="mt-2 p-2 bg-stone-50 rounded-lg ring-1 ring-stone-300">
+                <img src={barcodePreview.startsWith('blob:') ? barcodePreview : (resolveImageUrl(barcodePreview) ?? barcodePreview)}
+                  alt="Code-barres" className="h-12 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2 border-t border-stone-200 pt-3">

@@ -135,3 +135,44 @@ async def upload_product_image(
     # Met à jour le produit
     updated = crud.update(db, product, ProductUpdate(image_url=image_url))
     return ProductRead.model_validate(updated)
+
+
+@router.post("/{product_id}/upload-barcode", response_model=ProductRead)
+async def upload_product_barcode(
+    product_id: int,
+    file: UploadFile = File(...),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProductRead:
+    """Upload une image de code-barres GS1. Mêmes contraintes que l'image
+    produit (jpeg/png/webp/gif, max 5 MB). Stockée dans uploads/products/,
+    son URL est sauvée dans product.barcode_image_url."""
+    product = crud.get_by_id(db, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Type de fichier non supporté. Autorisés : JPEG, PNG, WebP, GIF.",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image trop volumineuse (max {MAX_IMAGE_SIZE_MB} MB).",
+        )
+
+    ext_map = {
+        "image/jpeg": "jpg", "image/png": "png",
+        "image/webp": "webp", "image/gif": "gif",
+    }
+    ext = ext_map[file.content_type]
+    filename = f"barcode-{product_id}-{uuid.uuid4().hex[:8]}.{ext}"
+    dest = UPLOAD_DIR / filename
+    dest.write_bytes(contents)
+
+    barcode_url = f"/uploads/products/{filename}"
+    updated = crud.update(db, product, ProductUpdate(barcode_image_url=barcode_url))
+    return ProductRead.model_validate(updated)

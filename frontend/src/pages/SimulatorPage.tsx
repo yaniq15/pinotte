@@ -9,11 +9,15 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card'
 const fmtCAD = (v: number) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(v)
 
+type Channel = 'consumer' | 'direct' | 'broker'
+
 export default function SimulatorPage() {
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [productId, setProductId] = useState('')
   const [costShockPct, setCostShockPct] = useState(0)
   const [priceShockPct, setPriceShockPct] = useState(0)
+  // Canal de vente : c'est ce prix-là qui sert de base à la marge
+  const [channel, setChannel] = useState<Channel>('direct')
 
   const recipe = useQuery({
     queryKey: ['recipe', productId],
@@ -23,10 +27,17 @@ export default function SimulatorPage() {
 
   const selectedProduct = products.data?.find(p => p.id === Number(productId))
 
+  // Prix selon le canal choisi
+  function priceForChannel(p: NonNullable<typeof selectedProduct>, ch: Channel): number {
+    if (ch === 'consumer') return Number(p.consumer_price || 0)
+    if (ch === 'broker') return Number(p.price_broker || 0)
+    return Number(p.price_direct || 0)
+  }
+
   const sim = useMemo(() => {
     if (!recipe.data || !selectedProduct) return null
     const baseCostPerUnit = recipe.data.cost_per_unit || Number(selectedProduct.unit_cost) || 0
-    const basePrice = Number(selectedProduct.consumer_price || selectedProduct.price_direct || selectedProduct.price_broker || 0)
+    const basePrice = priceForChannel(selectedProduct, channel)
     const baseMargin = basePrice - baseCostPerUnit
     const baseMarginPct = basePrice > 0 ? (baseMargin / basePrice) * 100 : 0
 
@@ -44,7 +55,7 @@ export default function SimulatorPage() {
       priceToKeepMargin,
       diffMarginPct: newMarginPct - baseMarginPct,
     }
-  }, [recipe.data, selectedProduct, costShockPct, priceShockPct])
+  }, [recipe.data, selectedProduct, costShockPct, priceShockPct, channel])
 
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-5xl">
@@ -54,13 +65,36 @@ export default function SimulatorPage() {
       />
 
       <Card className="mb-4">
-        <CardBody>
-          <label className="block text-xs font-semibold text-stone-600 mb-1.5">Produit à simuler</label>
-          <select value={productId} onChange={e => setProductId(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm bg-white">
-            <option value="">— choisir un produit —</option>
-            {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+        <CardBody className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-stone-600 mb-1.5">Produit à simuler</label>
+            <select value={productId} onChange={e => setProductId(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm bg-white">
+              <option value="">— choisir un produit —</option>
+              {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+
+          {selectedProduct && (
+            <div>
+              <label className="block text-xs font-semibold text-stone-600 mb-1.5">
+                Canal de vente <span className="font-normal text-stone-400">— quel prix sert de base à la marge</span>
+              </label>
+              <div className="inline-flex rounded-lg ring-1 ring-stone-300 overflow-hidden flex-wrap">
+                <ChannelBtn active={channel === 'consumer'} onClick={() => setChannel('consumer')}
+                  label="Consommateur" price={Number(selectedProduct.consumer_price || 0)} />
+                <ChannelBtn active={channel === 'direct'} onClick={() => setChannel('direct')}
+                  label="Direct magasin" price={Number(selectedProduct.price_direct || 0)} borderLeft />
+                <ChannelBtn active={channel === 'broker'} onClick={() => setChannel('broker')}
+                  label="Courtier" price={Number(selectedProduct.price_broker || 0)} borderLeft />
+              </div>
+              <p className="text-[11px] text-stone-500 mt-1.5">
+                {channel === 'consumer' && 'Prix de détail en magasin (PDS). Ta marge réelle est plus basse si tu vends à un magasin ou un courtier.'}
+                {channel === 'direct' && 'Prix que tu reçois en vendant directement à un magasin. C\'est souvent ton canal le plus rentable.'}
+                {channel === 'broker' && 'Prix que tu reçois via un courtier (commission déduite). C\'est ta marge la plus serrée.'}
+              </p>
+            </div>
+          )}
         </CardBody>
       </Card>
 
@@ -150,5 +184,28 @@ export default function SimulatorPage() {
         </>
       )}
     </div>
+  )
+}
+
+function ChannelBtn({ active, onClick, label, price, borderLeft }: {
+  active: boolean
+  onClick: () => void
+  label: string
+  price: number
+  borderLeft?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-2 text-sm font-medium transition ${borderLeft ? 'border-l border-stone-300' : ''} ${
+        active ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700 hover:bg-stone-50'
+      }`}
+    >
+      {label}
+      <span className={`block text-[11px] tabular-nums ${active ? 'text-white/80' : 'text-stone-400'}`}>
+        {price > 0 ? fmtCAD(price) : '— non défini'}
+      </span>
+    </button>
   )
 }

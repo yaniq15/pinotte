@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useAuth'
 import { PageHeader } from '../components/shared/AppLayout'
@@ -6,12 +7,13 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { loadCompanyInfo, saveCompanyInfo, type CompanyInfo } from '../lib/companyInfo'
+import { loadLabelSettings, saveLabelSettings, DEFAULT_LABEL_SETTINGS, type LabelSettings } from '../lib/labelSettings'
 import { listCashSnapshots, createCashSnapshot } from '../api/pme'
 import { inviteUser, listUsers, type UserInviteResult } from '../api/users'
 import { changePassword } from '../api/auth'
 import { useT, useLang } from '../lib/i18n'
 import { BRAND } from '../lib/brand'
-import { Save, CheckCircle2, Languages, UserPlus, Copy, Check, KeyRound, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { Save, CheckCircle2, Languages, UserPlus, Copy, Check, KeyRound, Eye, EyeOff, AlertTriangle, Tag } from 'lucide-react'
 
 export default function SettingsPage() {
   const { data: user } = useCurrentUser()
@@ -110,9 +112,153 @@ export default function SettingsPage() {
       {/* Informations entreprise — apparaissent sur les factures PDF */}
       <CompanyInfoCard />
 
+      {/* Personnalisation des étiquettes de lot */}
+      <LabelSettingsCard />
+
       {/* OWNER uniquement : inviter un nouveau membre */}
       {user.role === 'OWNER' && <InviteUserCard />}
     </div>
+  )
+}
+
+function LabelSettingsCard() {
+  const [s, setS] = useState<LabelSettings>(loadLabelSettings())
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { setS(loadLabelSettings()) }, [])
+
+  function set<K extends keyof LabelSettings>(key: K, value: LabelSettings[K]) {
+    setS(prev => ({ ...prev, [key]: value }))
+    setSaved(false)
+  }
+  function save() {
+    saveLabelSettings(s)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader
+        title="🏷️ Étiquettes de lot"
+        subtitle="Personnalise l'apparence de tes étiquettes imprimées. Réglages appliqués à toutes les étiquettes."
+      />
+      <CardBody className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Colonne réglages */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-stone-600 mb-1">Format par défaut</label>
+              <div className="inline-flex rounded-lg ring-1 ring-stone-300 overflow-hidden w-full">
+                <button type="button" onClick={() => set('defaultFormat', 'small')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium ${s.defaultFormat === 'small' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700'}`}>
+                  Petite · 24/page
+                </button>
+                <button type="button" onClick={() => set('defaultFormat', 'large')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium border-l border-stone-300 ${s.defaultFormat === 'large' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700'}`}>
+                  Grande · 2/page
+                </button>
+              </div>
+            </div>
+
+            <Toggle label="Afficher la marque" checked={s.showBrand} onChange={v => set('showBrand', v)} />
+            {s.showBrand && (
+              <div className="pl-6 space-y-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-stone-500 mb-1">Texte de marque</label>
+                  <input value={s.brandText} onChange={e => set('brandText', e.target.value)}
+                    className="w-full px-3 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm" placeholder="CHIKA" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-stone-500 mb-1">Couleur de la marque</label>
+                  <input type="color" value={s.accentColor} onChange={e => set('accentColor', e.target.value)}
+                    className="h-8 w-16 rounded ring-1 ring-stone-300 cursor-pointer" />
+                </div>
+              </div>
+            )}
+            <Toggle label="Afficher le nom du produit" checked={s.showProductName} onChange={v => set('showProductName', v)} />
+            <Toggle label="Afficher le numéro de lot" checked={s.showLotNumber} onChange={v => set('showLotNumber', v)} />
+            <Toggle label="Afficher la date de production" checked={s.showProductionDate} onChange={v => set('showProductionDate', v)} />
+            <Toggle label="Afficher la date d'expiration" checked={s.showExpiryDate} onChange={v => set('showExpiryDate', v)} />
+            <Toggle label="Afficher le code-barres GS1" checked={s.showBarcode} onChange={v => set('showBarcode', v)} />
+          </div>
+
+          {/* Colonne aperçu */}
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1">
+              <Tag size={12} /> Aperçu
+            </div>
+            <div className="bg-stone-100 rounded-lg p-4 flex items-center justify-center min-h-[140px]">
+              <div className="bg-white ring-1 ring-stone-300 rounded-md p-3 w-56 shadow-sm">
+                {s.showBrand && (
+                  <div className="text-sm font-black tracking-widest" style={{ color: s.accentColor }}>
+                    {s.brandText || 'MARQUE'}
+                  </div>
+                )}
+                {s.showProductName && (
+                  <div className="text-sm font-bold text-stone-900 mt-0.5">Chikanda à l'arachide</div>
+                )}
+                {s.showLotNumber && (
+                  <div className="text-xs mt-1">
+                    <span className="text-stone-400 uppercase text-[9px] tracking-wider">Lot </span>
+                    <span className="font-bold tabular-nums">L-2026-05</span>
+                  </div>
+                )}
+                {(s.showProductionDate || s.showExpiryDate) && (
+                  <div className="flex justify-between mt-1.5 text-[10px]">
+                    {s.showProductionDate && (
+                      <div>
+                        <div className="text-stone-400 uppercase tracking-wider">Production</div>
+                        <div className="font-semibold">21 mai 2026</div>
+                      </div>
+                    )}
+                    {s.showExpiryDate && (
+                      <div>
+                        <div className="text-stone-400 uppercase tracking-wider">Expiration</div>
+                        <div className="font-semibold">21 juil. 2026</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {s.showBarcode && (
+                  <div className="mt-2 flex justify-center">
+                    <div className="font-mono text-[8px] text-stone-500 tracking-tight">▌▎▌▌▎▌▎▎▌▌▎▌▎ 0627843…</div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-stone-500 mt-2 italic">
+              Le code-barres réel se définit par produit (champ GTIN dans la fiche produit).
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-stone-200 pt-3">
+          <button type="button" onClick={() => setS(DEFAULT_LABEL_SETTINGS)}
+            className="text-xs text-stone-500 hover:text-chika-paprika">
+            Réinitialiser aux valeurs par défaut
+          </button>
+          <div className="flex items-center gap-3">
+            {saved && (
+              <span className="flex items-center gap-1 text-sm text-emerald-700">
+                <CheckCircle2 size={14} /> Enregistré
+              </span>
+            )}
+            <Button onClick={save} icon={<Save size={14} />}>Enregistrer</Button>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-sm cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+        className="accent-chika-paprika w-4 h-4" />
+      <span className="text-stone-700">{label}</span>
+    </label>
   )
 }
 
@@ -441,7 +587,7 @@ function CashSnapshotCard() {
 }
 
 function CashSnapshotForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(todayISO())
   const [balance, setBalance] = useState('')
   const [notes, setNotes] = useState('')
   const mut = useMutation({

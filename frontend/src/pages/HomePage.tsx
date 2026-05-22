@@ -118,6 +118,9 @@ export default function HomePage() {
             />
           </div>
 
+          {/* État des résultats — le vrai bénéfice net, en cascade */}
+          <IncomeStatementCard data={report.income_statement} fmtCAD={fmtCADfull} />
+
           {/* Bandeau Événements — montre la part incluse dans les KPI globaux */}
           {report.events_count > 0 && (
             <Card className="mb-6 ring-chika-paprika/30 bg-chika-paprika/5">
@@ -391,6 +394,88 @@ function EmptyChart({ message }: { message: string }) {
   return <div className="h-[240px] flex items-center justify-center text-sm text-stone-400">{message}</div>
 }
 
+// État des résultats en cascade — montre comment on passe des revenus au
+// vrai bénéfice net (revenus − COGS − frais d'exploitation).
+function IncomeStatementCard({ data, fmtCAD }: {
+  data: {
+    revenue: number; cogs: number; gross_margin: number; gross_margin_pct: number | null
+    operating_expenses: number; net_profit: number; net_profit_pct: number | null
+    cogs_typed_expenses_excluded: number; capex_excluded: number
+  }
+  fmtCAD: (v: number) => string
+}) {
+  const profitPositive = data.net_profit >= 0
+  return (
+    <Card className="mb-6">
+      <CardHeader
+        title="État des résultats"
+        subtitle="Le vrai bénéfice net : revenus − coût de production − frais d'exploitation"
+      />
+      <CardBody className="p-0">
+        <table className="w-full text-sm">
+          <tbody>
+            <ISRow label="Revenus (ventes payées + événements)" value={fmtCAD(data.revenue)} />
+            <ISRow label="− Coût de production des ventes (COGS)"
+              value={`−${fmtCAD(data.cogs)}`} tone="muted" />
+            <ISRow label="= Marge brute"
+              value={fmtCAD(data.gross_margin)}
+              hint={data.gross_margin_pct !== null ? `${data.gross_margin_pct}%` : undefined}
+              bold separatorTop />
+            <ISRow label="− Frais d'exploitation (loyer, transport, marketing…)"
+              value={`−${fmtCAD(data.operating_expenses)}`} tone="muted" />
+            <ISRow
+              label="= BÉNÉFICE NET"
+              value={fmtCAD(data.net_profit)}
+              hint={data.net_profit_pct !== null ? `${data.net_profit_pct}%` : undefined}
+              bold big separatorTop
+              tone={profitPositive ? 'positive' : 'negative'}
+            />
+          </tbody>
+        </table>
+        {(data.cogs_typed_expenses_excluded > 0 || data.capex_excluded > 0) && (
+          <div className="px-5 py-3 border-t border-stone-200 text-[11px] text-stone-500 space-y-0.5">
+            {data.cogs_typed_expenses_excluded > 0 && (
+              <div>ℹ️ {fmtCAD(data.cogs_typed_expenses_excluded)} de dépenses classées « COGS » exclues des frais d'exploitation (déjà comptées dans le coût de production via les recettes — pas de double comptage).</div>
+            )}
+            {data.capex_excluded > 0 && (
+              <div>ℹ️ {fmtCAD(data.capex_excluded)} d'immobilisations (CAPEX) exclues du résultat — elles sont amorties sur plusieurs années (voir page Immobilisations).</div>
+            )}
+          </div>
+        )}
+        <div className="px-5 py-3 border-t border-stone-200 text-[11px] text-stone-500">
+          💡 Le COGS vient du coût unitaire de tes recettes (Calculateur). Si un produit n'a pas de recette chiffrée, son coût compte 0 — pense à le renseigner pour un bénéfice exact.
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
+function ISRow({ label, value, hint, bold, big, separatorTop, tone }: {
+  label: string
+  value: string
+  hint?: string
+  bold?: boolean
+  big?: boolean
+  separatorTop?: boolean
+  tone?: 'muted' | 'positive' | 'negative'
+}) {
+  const valueColor = tone === 'positive' ? 'text-emerald-700'
+    : tone === 'negative' ? 'text-red-700'
+    : tone === 'muted' ? 'text-stone-500'
+    : 'text-stone-900'
+  return (
+    <tr className={separatorTop ? 'border-t-2 border-stone-300' : 'border-t border-stone-100'}>
+      <td className={`px-5 py-2.5 ${bold ? 'font-bold' : ''} ${big ? 'text-base' : ''} text-stone-700`}>
+        {label}
+      </td>
+      <td className={`px-5 py-2.5 text-right tabular-nums ${bold ? 'font-bold' : 'font-medium'} ${big ? 'text-lg' : ''} ${valueColor}`}>
+        {value}
+        {hint && <span className="ml-2 text-[11px] font-normal text-stone-400">{hint}</span>}
+      </td>
+    </tr>
+  )
+}
+
 // Split-button "Excel comptable" : clic principal → utilise la langue de l'app,
 // clic sur le caret → menu pour forcer FR ou EN (utile pour envoyer à un
 // comptable anglophone même si l'app est en FR).
@@ -418,7 +503,7 @@ function XlsxExportButton({ year, month, lang }: { year: number; month: number; 
   }
 
   return (
-    <div ref={ref} className="inline-flex items-stretch">
+    <div ref={ref} className="relative inline-flex items-stretch">
       {/* Bouton principal — langue actuelle */}
       <button
         type="button"
@@ -440,8 +525,7 @@ function XlsxExportButton({ year, month, lang }: { year: number; month: number; 
         <ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-30 right-0 top-full mt-1 bg-white rounded-lg ring-1 ring-stone-300 shadow-lg overflow-hidden min-w-[12rem]"
-          style={{ marginTop: '40px' }}>
+        <div className="absolute z-30 right-0 top-full mt-1.5 bg-white rounded-lg ring-1 ring-stone-300 shadow-lg overflow-hidden min-w-[12rem]">
           <button type="button" onClick={() => run('fr')}
             className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-chika-paprika">
             🇫🇷 Français

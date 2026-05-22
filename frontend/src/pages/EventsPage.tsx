@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -278,7 +279,7 @@ function EventForm({ initial, onClose, onSaved }: { initial: ChikaEvent | null; 
   const [lang] = useLang()
   const [serverError, setServerError] = useState<string | null>(null)
   const [rows, setRows] = useState<BreakdownRow[]>(rowsFromBreakdown(initial?.materials_breakdown))
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
 
   // Catalogue matières premières (pour suggestions de libellé)
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => listMaterials(false) })
@@ -385,7 +386,16 @@ function EventForm({ initial, onClose, onSaved }: { initial: ChikaEvent | null; 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form onClick={e => e.stopPropagation()}
-        onSubmit={handleSubmit(v => mut.mutate(v))}
+        onSubmit={handleSubmit(
+          v => mut.mutate(v),
+          // onError : la validation a échoué. On scrolle en haut pour montrer
+          // le champ fautif (souvent "Nom" non rempli, hors écran).
+          () => {
+            const form = document.getElementById('event-form-scroll')
+            form?.scrollTo({ top: 0, behavior: 'smooth' })
+          },
+        )}
+        id="event-form-scroll"
         className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-stone-900">
@@ -394,6 +404,11 @@ function EventForm({ initial, onClose, onSaved }: { initial: ChikaEvent | null; 
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
+        {Object.keys(errors).length > 0 && (
+          <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            ⚠ Des champs obligatoires sont vides ou invalides — ils sont surlignés en rouge ci-dessous.
+          </div>
+        )}
 
         <Field label={t('events.field.name')} error={errors.name?.message}>
           <input {...register('name')} className={inputCls} placeholder="Ex: Festival Africain de Montréal" />
@@ -575,12 +590,19 @@ function EventForm({ initial, onClose, onSaved }: { initial: ChikaEvent | null; 
           <textarea {...register('notes')} rows={2} className={inputCls} placeholder="Météo, observations…" />
         </Field>
 
-        <div className="flex gap-2 justify-end pt-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">{t('action.cancel')}</button>
-          <button type="submit" disabled={isSubmitting}
-            className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-            {isSubmitting ? '…' : t('action.save')}
-          </button>
+        <div className="pt-2">
+          {Object.keys(errors).length > 0 && (
+            <p className="text-xs text-red-600 text-right mb-2">
+              ⚠ {errors.name ? 'Le nom de l\'événement est obligatoire.' : 'Corrige les champs en rouge ci-dessus.'}
+            </p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">{t('action.cancel')}</button>
+            <button type="submit" disabled={isSubmitting}
+              className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+              {isSubmitting ? '…' : t('action.save')}
+            </button>
+          </div>
         </div>
       </form>
     </div>

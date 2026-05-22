@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, X } from 'lucide-react'
 import { listFixedAssets, createFixedAsset, deleteFixedAsset } from '../api/pme'
@@ -126,7 +127,7 @@ export default function FixedAssetsPage() {
 
 function FixedAssetForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(todayISO())
   const [cost, setCost] = useState('')
   const [classIdx, setClassIdx] = useState(0)
   const [notes, setNotes] = useState('')

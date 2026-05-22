@@ -26,6 +26,17 @@ export interface MonthlyReport {
   events_revenue: number
   events_cost: number
   events_count: number
+  income_statement: {
+    revenue: number
+    cogs: number
+    gross_margin: number
+    gross_margin_pct: number | null
+    operating_expenses: number
+    net_profit: number
+    net_profit_pct: number | null
+    cogs_typed_expenses_excluded: number
+    capex_excluded: number
+  }
 }
 
 export async function getMonthlyReport(year: number, month: number): Promise<MonthlyReport> {

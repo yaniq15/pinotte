@@ -18,6 +18,8 @@ class ProductBase(BaseModel):
     active: bool = True
     image_url: Optional[str] = Field(None, max_length=500)
     taxable: bool = Field(False, description="Si True, TPS/TVQ ajoutées à la vente. Default False (épicerie QC détaxée).")
+    gtin: Optional[str] = Field(None, max_length=14, description="Code GS1 GTIN-13/14 (numérique).")
+    barcode_image_url: Optional[str] = Field(None, max_length=500)
 
 
 class ProductCreate(ProductBase):
@@ -37,6 +39,8 @@ class ProductUpdate(BaseModel):
     active: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=500)
     taxable: Optional[bool] = None
+    gtin: Optional[str] = Field(None, max_length=14)
+    barcode_image_url: Optional[str] = Field(None, max_length=500)
 
 
 class ProductRead(ProductBase):

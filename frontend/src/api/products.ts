@@ -14,6 +14,8 @@ export interface Product {
   active: boolean
   image_url: string | null
   taxable: boolean
+  gtin: string | null
+  barcode_image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -31,6 +33,8 @@ export interface ProductPayload {
   active?: boolean
   image_url?: string | null
   taxable?: boolean
+  gtin?: string | null
+  barcode_image_url?: string | null
 }
 
 export async function listProducts(): Promise<Product[]> {
@@ -57,6 +61,17 @@ export async function uploadProductImage(id: number, file: File): Promise<Produc
   form.append('file', file)
   const { data } = await api.post<Product>(
     `/api/products/${id}/upload-image`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return data
+}
+
+export async function uploadProductBarcode(id: number, file: File): Promise<Product> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post<Product>(
+    `/api/products/${id}/upload-barcode`,
     form,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
