@@ -7,9 +7,10 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { loadCompanyInfo, saveCompanyInfo, type CompanyInfo } from '../lib/companyInfo'
 import { listCashSnapshots, createCashSnapshot } from '../api/pme'
+import { inviteUser, listUsers, type UserInviteResult } from '../api/users'
 import { useT, useLang } from '../lib/i18n'
 import { BRAND } from '../lib/brand'
-import { Save, CheckCircle2, Languages } from 'lucide-react'
+import { Save, CheckCircle2, Languages, UserPlus, Copy, Check } from 'lucide-react'
 
 export default function SettingsPage() {
   const { data: user } = useCurrentUser()
@@ -92,7 +93,158 @@ export default function SettingsPage() {
 
       {/* Informations entreprise — apparaissent sur les factures PDF */}
       <CompanyInfoCard />
+
+      {/* OWNER uniquement : inviter un nouveau membre */}
+      {user.role === 'OWNER' && <InviteUserCard />}
     </div>
+  )
+}
+
+function InviteUserCard() {
+  const qc = useQueryClient()
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: listUsers })
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'OWNER' | 'USER'>('USER')
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<UserInviteResult | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const mut = useMutation({
+    mutationFn: () => inviteUser({ name: name.trim(), email: email.trim(), role }),
+    onSuccess: (data) => {
+      setResult(data)
+      setError(null)
+      setName('')
+      setEmail('')
+      setRole('USER')
+      qc.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(msg || 'Erreur lors de la création du compte')
+    },
+  })
+
+  async function handleCopyPassword() {
+    if (!result) return
+    await navigator.clipboard.writeText(result.temp_password)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Inviter un membre"
+        subtitle="Créer un compte pour un partenaire ou employé"
+        action={<UserPlus size={18} className="text-stone-400" />}
+      />
+      <CardBody className="space-y-4">
+        {result && (
+          <div className="rounded-lg border-2 border-chika-paprika/40 bg-chika-creamSoft/60 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-stone-800">
+                  Compte créé pour {result.user.name} ({result.user.email})
+                </p>
+                <p className="text-xs text-stone-600 mt-1">
+                  Rôle : <Badge tone={result.user.role === 'OWNER' ? 'paprika' : 'neutral'}>{result.user.role}</Badge>
+                </p>
+              </div>
+            </div>
+            <div className="rounded-md bg-white ring-1 ring-stone-300 p-3">
+              <p className="text-xs uppercase tracking-wider text-stone-500 mb-1.5">
+                Mot de passe temporaire — à partager UNE FOIS avec l'invité
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 font-mono text-sm bg-stone-50 px-3 py-2 rounded select-all">
+                  {result.temp_password}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyPassword}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md bg-stone-800 text-white hover:bg-stone-700 transition"
+                >
+                  {copied ? <><Check size={14} /> Copié</> : <><Copy size={14} /> Copier</>}
+                </button>
+              </div>
+              <p className="text-xs text-stone-500 mt-2">
+                ⚠ Ce mot de passe ne sera plus jamais affiché. Partage-le maintenant via Signal, mail perso, ou en personne.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setResult(null)}
+              className="text-xs text-stone-600 underline hover:text-stone-800"
+            >
+              Fermer et inviter un autre membre
+            </button>
+          </div>
+        )}
+
+        {!result && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Nom" value={name} onChange={setName} placeholder="Prénom Nom" />
+              <FormField label="Email" value={email} onChange={setEmail} placeholder="partenaire@exemple.com" />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-wider text-stone-500 mb-1.5 block">Rôle</label>
+              <div className="inline-flex rounded-lg ring-1 ring-stone-300 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setRole('USER')}
+                  className={`px-4 py-2 text-sm font-medium transition ${
+                    role === 'USER' ? 'bg-stone-800 text-white' : 'bg-white text-stone-700 hover:bg-stone-50'
+                  }`}
+                >
+                  USER (accès limité)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('OWNER')}
+                  className={`px-4 py-2 text-sm font-medium border-l border-stone-300 transition ${
+                    role === 'OWNER' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700 hover:bg-stone-50'
+                  }`}
+                >
+                  OWNER (accès complet)
+                </button>
+              </div>
+            </div>
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">⚠ {error}</p>}
+            <Button
+              onClick={() => mut.mutate()}
+              disabled={mut.isPending || !name.trim() || !email.trim()}
+              className="inline-flex items-center gap-2"
+            >
+              <UserPlus size={16} />
+              {mut.isPending ? 'Création...' : 'Créer le compte'}
+            </Button>
+          </>
+        )}
+
+        {usersQuery.data && usersQuery.data.length > 0 && (
+          <div className="pt-4 border-t border-stone-200">
+            <p className="text-xs uppercase tracking-wider text-stone-500 mb-2">
+              Membres actuels ({usersQuery.data.length})
+            </p>
+            <ul className="space-y-1.5 text-sm">
+              {usersQuery.data.map((u) => (
+                <li key={u.id} className="flex items-center justify-between py-1">
+                  <span>
+                    <span className="font-medium">{u.name}</span>
+                    <span className="text-stone-500"> · {u.email}</span>
+                  </span>
+                  <Badge tone={u.role === 'OWNER' ? 'paprika' : 'neutral'}>{u.role}</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   )
 }
 

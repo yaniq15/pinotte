@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -35,3 +35,14 @@ class TokenResponse(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     active: Optional[bool] = None
+
+
+class UserInviteIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    email: EmailStr
+    role: Literal["OWNER", "USER"] = "USER"
+
+
+class UserInviteOut(BaseModel):
+    user: UserRead
+    temp_password: str

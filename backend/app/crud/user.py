@@ -51,6 +51,23 @@ def create_oauth_user(db: Session, *, email: str, name: str) -> User:
     return user
 
 
+def create_invited(db: Session, *, name: str, email: str, role: str, temp_password: str) -> User:
+    """Créé par un OWNER via l'endpoint /api/users (invitation manuelle).
+    Le temp_password est hashé puis stocké. Le user invité s'en sert pour son
+    premier login et devrait le changer ensuite (flow à coder plus tard)."""
+    user = User(
+        name=name.strip()[:100],
+        email=email.lower(),
+        password_hash=hash_password(temp_password),
+        role=role,
+        active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def authenticate(db: Session, email: str, password: str) -> Optional[User]:
     user = get_by_email(db, email)
     if not user or not user.active:

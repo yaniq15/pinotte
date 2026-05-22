@@ -26,6 +26,7 @@ from .api.routes import products as product_routes
 from .api.routes import recipes as recipe_routes
 from .api.routes import reports as report_routes
 from .api.routes import sales as sale_routes
+from .api.routes import users as user_routes
 from .core.config import settings
 from .core.database import SessionLocal
 from .core.seed import seed_products
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(material_routes.router,  prefix="/api")
     app.include_router(event_routes.router,     prefix="/api")
     app.include_router(pme_routes.router,       prefix="/api")
+    app.include_router(user_routes.router,      prefix="/api")
 
     return app
 
