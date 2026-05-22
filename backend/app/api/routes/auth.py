@@ -14,10 +14,10 @@ from sqlalchemy.orm import Session
 from ...core.config import settings
 from ...core.database import get_db
 from ...core.rate_limit import limiter
-from ...core.security import create_access_token, validate_password_strength
+from ...core.security import create_access_token, hash_password, validate_password_strength, verify_password
 from ...crud import user as user_crud
 from ...models.user import User
-from ...schemas.auth import TokenResponse, UserLogin, UserRead, UserRegister
+from ...schemas.auth import ChangePasswordIn, TokenResponse, UserLogin, UserRead, UserRegister
 from ..deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -139,6 +139,43 @@ def google_login(
 @router.get("/me", response_model=UserRead)
 def me(current: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current)
+
+
+@router.patch("/me/password")
+@limiter.limit("5/5minutes")
+def change_password(
+    request: Request,  # noqa: ARG001 — required by slowapi
+    payload: ChangePasswordIn,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+) -> dict:
+    """Permet à l'utilisateur connecté de changer son propre mot de passe.
+
+    Workflow attendu :
+    - User reçoit un temp password (via invite OWNER ou self-register)
+    - Se connecte avec ce temp password
+    - Va dans Settings → Sécurité → change pour son propre password
+    """
+    if not verify_password(payload.current_password, current.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mot de passe actuel incorrect",
+        )
+    try:
+        validate_password_strength(payload.new_password)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+    if verify_password(payload.new_password, current.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Le nouveau mot de passe doit être différent de l'actuel",
+        )
+    current.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.get("/config")

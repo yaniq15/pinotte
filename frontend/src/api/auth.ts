@@ -33,3 +33,10 @@ export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/api/auth/google', { id_token: idToken })
   return data
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await api.patch('/api/auth/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}

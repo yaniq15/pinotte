@@ -8,9 +8,10 @@ import { Button } from '../components/ui/Button'
 import { loadCompanyInfo, saveCompanyInfo, type CompanyInfo } from '../lib/companyInfo'
 import { listCashSnapshots, createCashSnapshot } from '../api/pme'
 import { inviteUser, listUsers, type UserInviteResult } from '../api/users'
+import { changePassword } from '../api/auth'
 import { useT, useLang } from '../lib/i18n'
 import { BRAND } from '../lib/brand'
-import { Save, CheckCircle2, Languages, UserPlus, Copy, Check } from 'lucide-react'
+import { Save, CheckCircle2, Languages, UserPlus, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react'
 
 export default function SettingsPage() {
   const { data: user } = useCurrentUser()
@@ -88,6 +89,9 @@ export default function SettingsPage() {
         </Card>
       </div>
 
+      {/* Sécurité du compte — tous les users connectés peuvent changer leur password */}
+      <ChangePasswordCard />
+
       {/* Solde bancaire pour cash runway */}
       <CashSnapshotCard />
 
@@ -96,6 +100,136 @@ export default function SettingsPage() {
 
       {/* OWNER uniquement : inviter un nouveau membre */}
       {user.role === 'OWNER' && <InviteUserCard />}
+    </div>
+  )
+}
+
+function ChangePasswordCard() {
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  function clientValidate(): string | null {
+    if (newPw.length < 8) return 'Le nouveau mot de passe doit faire au moins 8 caractères'
+    if (!/\d/.test(newPw)) return 'Le nouveau mot de passe doit contenir au moins 1 chiffre'
+    if (newPw !== confirmPw) return 'La confirmation ne correspond pas au nouveau mot de passe'
+    if (newPw === currentPw) return 'Le nouveau mot de passe doit être différent de l\'actuel'
+    return null
+  }
+
+  const mut = useMutation({
+    mutationFn: () => changePassword(currentPw, newPw),
+    onSuccess: () => {
+      setSuccess(true)
+      setError(null)
+      setCurrentPw('')
+      setNewPw('')
+      setConfirmPw('')
+      setTimeout(() => setSuccess(false), 4000)
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(msg || 'Erreur lors du changement de mot de passe')
+    },
+  })
+
+  function handleSubmit() {
+    const localErr = clientValidate()
+    if (localErr) {
+      setError(localErr)
+      return
+    }
+    setError(null)
+    mut.mutate()
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader
+        title="Sécurité du compte"
+        subtitle="Change ton mot de passe"
+        action={<KeyRound size={18} className="text-stone-400" />}
+      />
+      <CardBody className="space-y-4 max-w-md">
+        <PasswordField
+          label="Mot de passe actuel"
+          value={currentPw}
+          onChange={setCurrentPw}
+          show={showCurrent}
+          onToggle={() => setShowCurrent(s => !s)}
+          placeholder="Ton password actuel (ou temp password reçu)"
+        />
+        <PasswordField
+          label="Nouveau mot de passe"
+          value={newPw}
+          onChange={setNewPw}
+          show={showNew}
+          onToggle={() => setShowNew(s => !s)}
+          placeholder="Min 8 caractères + 1 chiffre"
+        />
+        <PasswordField
+          label="Confirmer le nouveau"
+          value={confirmPw}
+          onChange={setConfirmPw}
+          show={showNew}
+          onToggle={() => setShowNew(s => !s)}
+          placeholder="Re-saisis le nouveau mot de passe"
+        />
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">⚠ {error}</p>
+        )}
+        {success && (
+          <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 flex items-center gap-2">
+            <CheckCircle2 size={16} /> Mot de passe changé avec succès.
+          </p>
+        )}
+        <Button
+          onClick={handleSubmit}
+          disabled={mut.isPending || !currentPw || !newPw || !confirmPw}
+          className="inline-flex items-center gap-2"
+        >
+          <KeyRound size={16} />
+          {mut.isPending ? 'Mise à jour...' : 'Changer le mot de passe'}
+        </Button>
+      </CardBody>
+    </Card>
+  )
+}
+
+function PasswordField({ label, value, onChange, show, onToggle, placeholder }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  show: boolean
+  onToggle: () => void
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wider text-stone-500 mb-1.5 block">{label}</label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 pr-10 text-sm rounded-md ring-1 ring-stone-300 focus:ring-2 focus:ring-chika-paprika focus:outline-none"
+          autoComplete="new-password"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          tabIndex={-1}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-stone-600 transition"
+          aria-label={show ? 'Masquer' : 'Afficher'}
+        >
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
     </div>
   )
 }

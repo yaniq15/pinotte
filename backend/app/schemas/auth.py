@@ -43,6 +43,11 @@ class UserInviteIn(BaseModel):
     role: Literal["OWNER", "USER"] = "USER"
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=200)
+    new_password: str = Field(..., min_length=8, max_length=200)
+
+
 class UserInviteOut(BaseModel):
     user: UserRead
     temp_password: str
