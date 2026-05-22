@@ -262,7 +262,6 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const tps = +(taxableHT * 0.05).toFixed(2)
   const tvq = +(taxableHT * 0.09975).toFixed(2)
   const totalTTC = +(totalHT + tps + tvq).toFixed(2)
-  const total = totalHT  // alias pour compat backend (envoie HT)
 
   const mut = useMutation({
     mutationFn: async () => {

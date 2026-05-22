@@ -172,7 +172,7 @@ export default function ProductsPage() {
 
 function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; costNetCaisse: number | null }) {
   // Calcule la vraie commission courtier appliquée à partir des prix stockés
-  const brokerPctReal = (p.price_direct && p.price_broker && p.price_direct > 0)
+  const brokerPctReal = (p.price_direct && p.price_broker && Number(p.price_direct) > 0)
     ? Math.round((1 - Number(p.price_broker) / Number(p.price_direct)) * 100)
     : null
   return (

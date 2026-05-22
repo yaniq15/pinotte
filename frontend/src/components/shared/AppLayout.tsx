@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout, PartyPopper,
-  ClipboardCheck, Building2, RefreshCcw, Factory, LineChart,
+  ClipboardCheck, RefreshCcw, Factory, LineChart,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'

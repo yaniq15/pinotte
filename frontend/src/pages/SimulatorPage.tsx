@@ -26,7 +26,7 @@ export default function SimulatorPage() {
   const sim = useMemo(() => {
     if (!recipe.data || !selectedProduct) return null
     const baseCostPerUnit = recipe.data.cost_per_unit || Number(selectedProduct.unit_cost) || 0
-    const basePrice = Number(selectedProduct.price_consumer || selectedProduct.price_store || selectedProduct.price_broker || 0)
+    const basePrice = Number(selectedProduct.consumer_price || selectedProduct.price_direct || selectedProduct.price_broker || 0)
     const baseMargin = basePrice - baseCostPerUnit
     const baseMarginPct = basePrice > 0 ? (baseMargin / basePrice) * 100 : 0
 
