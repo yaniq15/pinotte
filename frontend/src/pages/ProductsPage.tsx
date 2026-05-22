@@ -369,7 +369,29 @@ function ProductForm({ initial, onClose, onSaved }: {
             <input type="number" min="1" {...register('units_per_box')} className={inputCls} />
           </Field>
           <Field label="Coût unitaire (production)">
-            <input type="number" step="0.01" {...register('unit_cost')} className={inputCls} placeholder="0.00" />
+            {isEdit ? (
+              <>
+                {/* Lecture seule en édition : le coût est piloté par le Calculateur.
+                    On garde la valeur dans le form (register) via un input caché
+                    pour ne pas l'écraser à la sauvegarde. */}
+                <input type="hidden" {...register('unit_cost')} />
+                <div className={`${inputCls} bg-stone-100 text-stone-500 cursor-not-allowed flex items-center`}>
+                  {watch('unit_cost') != null && watch('unit_cost') !== ('' as unknown as number)
+                    ? `${Number(watch('unit_cost')).toFixed(2)} $`
+                    : '— non défini —'}
+                </div>
+                <p className="mt-1 text-[11px] text-stone-500">
+                  🔒 Calculé via le <strong>Calculateur</strong> (recette → « Appliquer au produit »). Non modifiable ici.
+                </p>
+              </>
+            ) : (
+              <>
+                <input type="number" step="0.01" {...register('unit_cost')} className={inputCls} placeholder="0.00" />
+                <p className="mt-1 text-[11px] text-stone-500">
+                  Coût initial optionnel. Sera ensuite piloté par le Calculateur.
+                </p>
+              </>
+            )}
           </Field>
           <Field label="Devise">
             <select {...register('currency')} className={inputCls}>
