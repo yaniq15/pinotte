@@ -15,9 +15,19 @@ from ...core.config import settings
 from ...core.database import get_db
 from ...core.rate_limit import limiter
 from ...core.security import create_access_token, hash_password, validate_password_strength, verify_password
+from ...core.email import send_password_reset_email
+from ...crud import password_reset as token_crud
 from ...crud import user as user_crud
 from ...models.user import User
-from ...schemas.auth import ChangePasswordIn, TokenResponse, UserLogin, UserRead, UserRegister
+from ...schemas.auth import (
+    ChangePasswordIn,
+    PasswordResetConfirmIn,
+    PasswordResetRequestIn,
+    TokenResponse,
+    UserLogin,
+    UserRead,
+    UserRegister,
+)
 from ..deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -175,6 +185,54 @@ def change_password(
         )
     current.password_hash = hash_password(payload.new_password)
     current.must_change_password = False
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/password-reset-request")
+@limiter.limit("3/15minutes")
+def password_reset_request(
+    request: Request,  # noqa: ARG001 — required by slowapi
+    payload: PasswordResetRequestIn,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Demande un email de réinitialisation. Toujours 200 même si l'email
+    n'existe pas, pour ne pas révéler qui est enregistré (anti-enumeration)."""
+    user = user_crud.get_by_email(db, payload.email)
+    if user and user.active:
+        token = token_crud.create_for_user(db, user.id)
+        reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+        try:
+            send_password_reset_email(user.email, user.name, reset_link)
+        except Exception as e:
+            # Ne pas leak l'erreur SMTP au caller (sécurité + UX), juste logger
+            print(f"[email error] send_password_reset_email failed: {e}")
+    return {"status": "ok"}
+
+
+@router.post("/password-reset-confirm")
+@limiter.limit("5/15minutes")
+def password_reset_confirm(
+    request: Request,  # noqa: ARG001 — required by slowapi
+    payload: PasswordResetConfirmIn,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Consomme un token de reset et applique le nouveau mot de passe."""
+    try:
+        validate_password_strength(payload.new_password)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+    user = token_crud.consume(db, payload.token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lien invalide, expiré ou déjà utilisé. Demande un nouveau lien.",
+        )
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
     db.commit()
     return {"status": "ok"}
 

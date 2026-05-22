@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     # Google Identity Services côté frontend (on vérifie le token côté serveur).
     GOOGLE_OAUTH_CLIENT_ID: str = ""
 
+    # ── Email (SMTP — pour password reset) ──
+    # Gmail recommandé en MVP : créer un App Password (Google Account → Security
+    # → 2-Step Verification → App passwords) et le coller dans SMTP_PASS.
+    # Sans SMTP_USER ni SMTP_PASS, send_email logge en console au lieu d'envoyer.
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    EMAIL_FROM: str = ""  # fallback sur SMTP_USER si vide
+
+    # URL publique du frontend — utilisée pour construire les liens dans les emails
+    # (ex: reset password). Pas de slash final.
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # Au boot, lever une alerte si JWT_SECRET_KEY est resté à la valeur par défaut
     # ET qu'on n'est PAS en mode DEBUG (= prod).
     def assert_prod_safe(self) -> None:

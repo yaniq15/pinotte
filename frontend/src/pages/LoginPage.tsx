@@ -254,6 +254,15 @@ export default function LoginPage() {
                   <ArrowRight size={16} className="relative transition group-hover:translate-x-0.5" />
                 )}
               </button>
+
+              <div className="text-center -mt-1">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-chika-brown/60 hover:text-chika-paprika transition"
+                >
+                  Mot de passe oublié ?
+                </Link>
+              </div>
             </form>
 
             {/* Séparateur + Google (si activé) */}

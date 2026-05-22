@@ -40,3 +40,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
     new_password: newPassword,
   })
 }
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await api.post('/api/auth/password-reset-request', { email })
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  await api.post('/api/auth/password-reset-confirm', { token, new_password: newPassword })
+}

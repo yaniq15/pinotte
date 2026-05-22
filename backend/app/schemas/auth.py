@@ -49,6 +49,15 @@ class ChangePasswordIn(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=200)
 
 
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(..., min_length=10, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=200)
+
+
 class UserInviteOut(BaseModel):
     user: UserRead
     temp_password: str
