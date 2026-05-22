@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, AlertTriangle, TrendingUp, TrendingDown, Wallet, Package as PackageIcon, PartyPopper, ChevronDown, FileSpreadsheet, FileText } from 'lucide-react'
+import { Download, AlertTriangle, AlertOctagon, Info, TrendingUp, TrendingDown, Wallet, Package as PackageIcon, PartyPopper, ChevronDown, ChevronRight, Zap, FileSpreadsheet, FileText } from 'lucide-react'
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -82,16 +82,27 @@ export default function HomePage() {
 
       {isLoading && <div className="text-stone-400 text-sm">{t('label.loading')}</div>}
 
-      {/* ⚡ Alertes proactives — toujours visibles en haut si présentes */}
+      {/* Alertes proactives — toujours visibles en haut si présentes */}
       {alerts.data && alerts.data.alerts.length > 0 && (
-        <Card className="mb-6 ring-amber-300/50 bg-amber-50/40">
-          <CardHeader title={`⚡ ${alerts.data.alerts.length} action${alerts.data.alerts.length > 1 ? 's' : ''} à examiner`}
-            subtitle="Signaux automatiques tirés de tes ventes, dépenses, stocks et trésorerie." />
-          <CardBody className="space-y-2">
+        <Card className="mb-6 overflow-hidden">
+          <div className="px-5 py-4 flex items-center gap-2.5 border-b border-stone-200">
+            <span className="w-7 h-7 rounded-lg bg-chika-paprika/10 flex items-center justify-center">
+              <Zap size={15} className="text-chika-paprika" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-stone-900">
+                {alerts.data.alerts.length} action{alerts.data.alerts.length > 1 ? 's' : ''} à examiner
+              </h3>
+              <p className="text-xs text-stone-500">
+                Signaux automatiques tirés de tes ventes, dépenses, stocks et trésorerie.
+              </p>
+            </div>
+          </div>
+          <div>
             {alerts.data.alerts.map((a, i) => (
               <AlertCard key={i} alert={a} onNavigate={(url) => navigate(url)} />
             ))}
-          </CardBody>
+          </div>
         </Card>
       )}
 
@@ -543,24 +554,43 @@ function XlsxExportButton({ year, month, lang }: { year: number; month: number; 
 // ────────────── PME FINANCE — sub-components ──────────────
 
 function AlertCard({ alert, onNavigate }: { alert: AlertItem; onNavigate: (url: string) => void }) {
-  const colors = {
-    critical: 'bg-red-50 ring-red-300/60 text-red-900',
-    warning:  'bg-amber-50 ring-amber-300/60 text-amber-900',
-    info:     'bg-blue-50 ring-blue-300/60 text-blue-900',
+  // Style épuré : fond blanc, fine barre d'accent à gauche, badge d'icône coloré.
+  // La couleur ne déborde pas — elle reste sur l'accent + le badge.
+  const cfg = {
+    critical: {
+      accent: 'border-l-red-500',
+      badge: 'bg-red-50 text-red-600',
+      Icon: AlertOctagon,
+    },
+    warning: {
+      accent: 'border-l-amber-400',
+      badge: 'bg-amber-50 text-amber-600',
+      Icon: AlertTriangle,
+    },
+    info: {
+      accent: 'border-l-blue-400',
+      badge: 'bg-blue-50 text-blue-600',
+      Icon: Info,
+    },
   }[alert.severity]
-  const icon = alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️'
+  const { Icon } = cfg
+
   return (
-    <div className={`px-4 py-3 rounded-lg ring-1 ${colors} flex items-start gap-3`}>
-      <span className="text-lg leading-none mt-0.5">{icon}</span>
+    <div className={`flex items-start gap-3 px-5 py-3.5 border-l-[3px] ${cfg.accent} border-b border-stone-100 last:border-b-0 hover:bg-stone-50/60 transition`}>
+      <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${cfg.badge}`}>
+        <Icon size={16} />
+      </span>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm">{alert.title}</div>
-        <div className="text-xs opacity-80 mt-0.5">{alert.description}</div>
+        <div className="font-semibold text-sm text-stone-900">{alert.title}</div>
+        <div className="text-xs text-stone-500 mt-0.5 leading-relaxed">{alert.description}</div>
       </div>
       {alert.action_url && alert.action_label && (
         <button
           onClick={() => onNavigate(alert.action_url!)}
-          className="shrink-0 text-xs font-semibold underline hover:no-underline">
-          {alert.action_label} →
+          className="shrink-0 inline-flex items-center gap-0.5 text-xs font-semibold text-chika-paprika hover:text-chika-paprikaDeep mt-0.5"
+        >
+          {alert.action_label}
+          <ChevronRight size={13} />
         </button>
       )}
     </div>
