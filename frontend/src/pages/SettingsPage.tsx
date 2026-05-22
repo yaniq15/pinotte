@@ -11,7 +11,7 @@ import { inviteUser, listUsers, type UserInviteResult } from '../api/users'
 import { changePassword } from '../api/auth'
 import { useT, useLang } from '../lib/i18n'
 import { BRAND } from '../lib/brand'
-import { Save, CheckCircle2, Languages, UserPlus, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { Save, CheckCircle2, Languages, UserPlus, Copy, Check, KeyRound, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 
 export default function SettingsPage() {
   const { data: user } = useCurrentUser()
@@ -22,6 +22,18 @@ export default function SettingsPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-4xl">
       <PageHeader title={t('settings.title')} description="Informations de compte et configuration." />
+
+      {user.must_change_password && (
+        <div className="mb-6 rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-900">Mot de passe temporaire détecté</p>
+            <p className="text-sm text-amber-800 mt-0.5">
+              Tu utilises encore le mot de passe temporaire reçu par invitation. Change-le ci-dessous avant d'accéder au reste de Pinotte.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <Card>

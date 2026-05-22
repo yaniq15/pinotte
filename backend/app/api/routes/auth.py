@@ -174,6 +174,7 @@ def change_password(
             detail="Le nouveau mot de passe doit être différent de l'actuel",
         )
     current.password_hash = hash_password(payload.new_password)
+    current.must_change_password = False
     db.commit()
     return {"status": "ok"}
 

@@ -1,10 +1,10 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout, PartyPopper,
   ClipboardCheck, RefreshCcw, Factory, LineChart,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useCurrentUser, clearToken } from '../../hooks/useAuth'
 import { BRAND } from '../../lib/brand'
@@ -41,9 +41,17 @@ const NAV_ITEMS: NavItem[] = [
 export default function AppLayout() {
   const { data: user } = useCurrentUser()
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
   const t = useT()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  // Lock invited users to /profil until they change their temp password
+  useEffect(() => {
+    if (user?.must_change_password && location.pathname !== '/profil') {
+      navigate('/profil', { replace: true })
+    }
+  }, [user?.must_change_password, location.pathname, navigate])
 
   function logout() {
     clearToken()
