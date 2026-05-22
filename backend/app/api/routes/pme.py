@@ -225,12 +225,18 @@ def cash_runway(
     _: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CashRunwayReport:
-    """Cash runway = nombre de mois de survie au burn rate moyen 3 derniers mois.
-    Burn rate = MOY(expenses_mois - revenue_paid_mois) pour les 3 derniers mois clos.
+    """Cash runway = nombre de mois de survie si on continue à perdre de
+    l'argent au rythme actuel.
+
+    Burn rate = MOYENNE de la PERTE NETTE (vrai bénéfice net négatif, COGS
+    inclus) sur les mois AVEC activité, du mois courant jusqu'à 3 mois en
+    arrière. On inclut le mois courant pour que le runway soit utilisable dès
+    le 1er mois (avant : il regardait 3 mois clos vides → ∞ trompeur).
+
     Status :
       - critical : < 3 mois
       - warning  : 3-6 mois
-      - healthy  : ≥ 6 mois
+      - healthy  : ≥ 6 mois (ou bénéficiaire → ∞)
     """
     latest_snap = db.scalar(
         select(CashSnapshot).order_by(CashSnapshot.snapshot_date.desc()).limit(1)
@@ -238,45 +244,57 @@ def cash_runway(
     if not latest_snap:
         return CashRunwayReport(status="no_data")
 
+    # Import local pour éviter l'import circulaire reports <-> pme
+    from .reports import monthly_report
+
     today = date.today()
-    burns: list[Decimal] = []
-    for i in range(1, 4):  # 3 derniers mois clos
+    losses: list[float] = []  # perte mensuelle (positif = on perd)
+    for i in range(0, 4):  # mois courant (i=0) + 3 précédents
         y = today.year
         m = today.month - i
         while m <= 0:
             m += 12
             y -= 1
-        start = date(y, m, 1)
-        end = date(y, m, monthrange(y, m)[1])
-        rev = Decimal(db.scalar(
-            select(func.coalesce(func.sum(Sale.total_amount), 0))
-            .where(Sale.status == "PAID", Sale.payment_date.between(start, end))
-        ) or 0)
-        exp = Decimal(db.scalar(
-            select(func.coalesce(func.sum(Expense.amount), 0))
-            .where(Expense.expense_date.between(start, end))
-        ) or 0)
-        burns.append(exp - rev)
-    avg_burn = (sum(burns) / Decimal(len(burns))).quantize(Decimal("0.01")) if burns else Decimal("0")
+        try:
+            report = monthly_report(year=y, month=m, db=db)  # type: ignore[call-arg]
+        except Exception:
+            continue
+        isr = report.get("income_statement") or {}
+        revenue = float(isr.get("revenue") or 0)
+        opex = float(isr.get("operating_expenses") or 0)
+        # Un mois "compte" s'il a une activité réelle (revenus ou dépenses)
+        if revenue > 0 or opex > 0:
+            losses.append(-float(report.get("net_profit") or 0))  # perte = −bénéfice
 
-    runway = None
-    statut = "no_data"
-    if avg_burn > 0:
-        runway = float(latest_snap.balance / avg_burn)
+    if not losses:
+        # Aucune activité nulle part → impossible de calculer un burn
+        return CashRunwayReport(
+            cash_balance=Decimal(latest_snap.balance),
+            cash_balance_date=latest_snap.snapshot_date,
+            status="no_data",
+        )
+
+    avg_loss = sum(losses) / len(losses)
+    balance = float(latest_snap.balance)
+
+    runway: float | None
+    if avg_loss <= 0:
+        # On gagne de l'argent (ou équilibre) → runway infini
+        statut = "healthy"
+        runway = 999.0
+    else:
+        runway = balance / avg_loss
         if runway < 3:
             statut = "critical"
         elif runway < 6:
             statut = "warning"
         else:
             statut = "healthy"
-    elif avg_burn <= 0:
-        statut = "healthy"  # plus de revenus que de dépenses, runway infini
-        runway = 999.0
 
     return CashRunwayReport(
         cash_balance=Decimal(latest_snap.balance),
         cash_balance_date=latest_snap.snapshot_date,
-        avg_monthly_burn=avg_burn,
+        avg_monthly_burn=Decimal(str(round(avg_loss, 2))),
         runway_months=round(runway, 1) if runway is not None else None,
         status=statut,
     )

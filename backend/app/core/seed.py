@@ -1,9 +1,10 @@
-"""Idempotent seed of Chika's real 3 products at boot.
+"""Seed des 3 produits Chika au boot — INSERT SEULEMENT.
 
-Pricing source : spreadsheet "Structure de prix Aliments Chika" (mai 2026).
-This seed is **upsert** : on every boot, the prices/units_per_box/store_margin of
-the 3 seeded SKUs are aligned with the values below so a code change here flows
-through to the running DB immediately.
+⚠️ Ce seed n'INSÈRE que les produits manquants. Il ne TOUCHE JAMAIS un
+produit existant : son unit_cost, ses prix, units_per_box… sont des données
+gérées par l'utilisateur (Calculateur, page Produits). Un upsert qui réaligne
+écraserait le travail de l'utilisateur à chaque déploiement (bug corrigé
+2026-05-22 : le coût unitaire appliqué via le Calculateur se faisait effacer).
 """
 from decimal import Decimal
 
@@ -58,26 +59,13 @@ def _spec_to_payload(spec) -> ProductCreate:
 
 
 def seed_products(db: Session) -> int:
-    """Upsert the 3 Chika products. Returns the count of inserts + updates that
-    actually changed the row (handy for log)."""
-    changed = 0
+    """Insère les 3 produits Chika SI ils n'existent pas (par SKU).
+    Ne modifie JAMAIS un produit existant — ses données appartiennent à
+    l'utilisateur. Retourne le nombre de produits insérés."""
+    inserted = 0
     for spec in CHIKA_SPECS:
         payload = _spec_to_payload(spec)
-        existing = product_crud.get_by_sku(db, payload.sku)
-        if existing is None:
+        if product_crud.get_by_sku(db, payload.sku) is None:
             product_crud.create(db, payload)
-            changed += 1
-            continue
-        # Realign existing seeded product to current spec
-        dirty = False
-        for field in ("name", "units_per_box", "unit_cost", "consumer_price",
-                      "store_margin_pct", "price_direct", "price_broker",
-                      "image_url"):
-            new_val = getattr(payload, field)
-            if getattr(existing, field) != new_val:
-                setattr(existing, field, new_val)
-                dirty = True
-        if dirty:
-            db.commit()
-            changed += 1
-    return changed
+            inserted += 1
+    return inserted
