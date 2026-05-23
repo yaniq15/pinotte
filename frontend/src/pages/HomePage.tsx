@@ -17,6 +17,7 @@ import type { AlertItem } from '../api/pme'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import MobileCollapse from '../components/shared/MobileCollapse'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useT, useLang } from '../lib/i18n'
@@ -130,6 +131,7 @@ export default function HomePage() {
           </div>
 
           {/* État des résultats — le vrai bénéfice net, en cascade */}
+          <MobileCollapse title="État des résultats" subtitle="Bénéfice détaillé + événements + taxes">
           <IncomeStatementCard data={report.income_statement} fmtCAD={fmtCADfull} />
 
           {/* Bandeau Événements — montre la part incluse dans les KPI globaux */}
@@ -204,7 +206,10 @@ export default function HomePage() {
             )
           })()}
 
+          </MobileCollapse>
+
           {/* Margins — remonté en premier (vue produit prioritaire) */}
+          <MobileCollapse title="Performance par produit" subtitle="Marges, ventes, concentration">
           <Card className="mb-6">
             <CardHeader
               title={t('dashboard.margin_by_product')}
@@ -304,7 +309,10 @@ export default function HomePage() {
             </div>
           )}
 
+          </MobileCollapse>
+
           {/* Top clients */}
+          <MobileCollapse title="Stock & top clients" subtitle="Inventaire + clients qui rapportent">
           <div className="grid grid-cols-1 mb-6">
             <Card>
               <CardHeader title={t('dashboard.top_clients')} />
@@ -369,6 +377,7 @@ export default function HomePage() {
               </CardBody>
             </Card>
           </div>
+          </MobileCollapse>
         </>
       )}
     </div>

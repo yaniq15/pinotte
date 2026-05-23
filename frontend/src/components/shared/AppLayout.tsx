@@ -10,6 +10,8 @@ import { useCurrentUser, clearToken } from '../../hooks/useAuth'
 import { BRAND } from '../../lib/brand'
 import { useLang, useT } from '../../lib/i18n'
 import { PinotteWordmark } from '../../pages/LoginPage'
+import MobileBottomNav from './MobileBottomNav'
+import MobileMoreSheet from './MobileMoreSheet'
 
 interface NavItem {
   to: string
@@ -45,6 +47,7 @@ export default function AppLayout() {
   const qc = useQueryClient()
   const t = useT()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   // Lock invited users to /profil until they change their temp password
   useEffect(() => {
@@ -136,33 +139,26 @@ export default function AppLayout() {
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* MOBILE TOP BAR */}
-        <header className="lg:hidden bg-white border-b border-stone-200">
+        {/* MOBILE TOP BAR — wordmark only, navigation handled by bottom tab bar */}
+        <header className="lg:hidden bg-white/95 backdrop-blur border-b border-stone-200 sticky top-0 z-30">
           <div className="px-4 py-3 flex items-center justify-between">
             <PinotteWordmark size="sm" />
-            <button onClick={logout}
-              className="flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50">
-              <LogOut size={14} /> {t('action.logout', 'Sortir')}
-            </button>
+            <div className="flex items-center gap-1">
+              <div className="w-8 h-8 rounded-full bg-chika-paprika text-white flex items-center justify-center text-[11px] font-bold">
+                {initials}
+              </div>
+            </div>
           </div>
-          <nav className="px-2 pb-2 flex gap-1 overflow-x-auto">
-            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
-              <NavLink key={to} to={to} end={to === '/'}
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                    isActive
-                      ? 'bg-chika-paprika text-white'
-                      : 'text-stone-600 bg-stone-100'
-                  }`}>
-                <Icon size={14} /> {t(labelKey)}
-              </NavLink>
-            ))}
-          </nav>
         </header>
 
-        <main className="flex-1 overflow-auto">
+        {/* Content with bottom padding on mobile to clear the fixed bottom nav */}
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0">
           <Outlet />
         </main>
+
+        {/* MOBILE BOTTOM NAVIGATION */}
+        <MobileBottomNav onOpenMore={() => setMoreOpen(true)} moreOpen={moreOpen} />
+        <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} onLogout={logout} />
       </div>
     </div>
   )
