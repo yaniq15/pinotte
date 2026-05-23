@@ -2,7 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   LogOut, Home, Package, Boxes, Warehouse, ArrowLeftRight, Users, Receipt, Wallet, Calculator, Settings, ChevronRight, ChevronDown, Sprout, PartyPopper,
-  ClipboardCheck, RefreshCcw, Factory, LineChart,
+  ClipboardCheck, RefreshCcw, Factory, LineChart, Plus,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -155,6 +155,22 @@ export default function AppLayout() {
         <main className="flex-1 overflow-auto pb-20 lg:pb-0">
           <Outlet />
         </main>
+
+        {/* MOBILE FAB — Nouvelle vente quick action (hidden when not relevant) */}
+        {!user?.must_change_password && (
+          <button
+            type="button"
+            onClick={() => navigate('/ventes?new=1')}
+            className="lg:hidden fixed bottom-20 right-4 z-30 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #E89B27 0%, #C5532E 100%)',
+              boxShadow: '0 10px 24px -6px rgba(197,83,46,0.55), 0 2px 6px rgba(0,0,0,0.1)',
+            }}
+            aria-label="Nouvelle vente"
+          >
+            <Plus size={26} strokeWidth={2.5} className="text-white" />
+          </button>
+        )}
 
         {/* MOBILE BOTTOM NAVIGATION */}
         <MobileBottomNav onOpenMore={() => setMoreOpen(true)} moreOpen={moreOpen} />

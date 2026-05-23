@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText } from 'lucide-react'
@@ -34,6 +35,15 @@ export default function SalesPage() {
   const [filterClient, setFilterClient] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Open the create form automatically if landed via FAB (?new=1)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const clients = useQuery({ queryKey: ['clients', ''], queryFn: () => listClients() })
   const sales = useQuery({

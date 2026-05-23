@@ -215,45 +215,76 @@ export default function HomePage() {
               title={t('dashboard.margin_by_product')}
               subtitle={t('dashboard.margin_subtitle')}
             />
-            <CardBody className="p-0 overflow-x-auto">
+            <CardBody className="p-0">
               {report.margin_by_product.length === 0
                 ? <EmptyState icon="📊" title={t('dashboard.margin.empty_title')} description={t('dashboard.margin.empty_desc')} />
                 : (
-                  <table className="w-full text-sm min-w-[720px]">
-                    <thead className="bg-stone-50 text-[10px] uppercase tracking-wider text-stone-500">
-                      <tr>
-                        <th className="text-left px-5 py-2.5">{t('dashboard.margin.product')}</th>
-                        <th className="text-right px-5 py-2.5">{t('dashboard.margin.revenue')}</th>
-                        <th className="text-right px-5 py-2.5">{t('dashboard.margin.cost')}</th>
-                        <th className="text-right px-5 py-2.5">{t('dashboard.margin.margin')}</th>
-                        <th className="text-right px-5 py-2.5">%</th>
-                        <th className="text-right px-5 py-2.5 bg-emerald-50/60 text-emerald-700">{t('dashboard.margin.paid_revenue')}</th>
-                        <th className="text-right px-5 py-2.5 bg-emerald-50/60 text-emerald-700">{t('dashboard.margin.paid_margin')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <>
+                    {/* MOBILE: cards verticales lisibles sans scroll horizontal */}
+                    <div className="lg:hidden divide-y divide-stone-200">
                       {report.margin_by_product.map(m => (
-                        <tr key={m.product_id} className="border-t border-stone-200">
-                          <td className="px-5 py-2.5 font-medium text-stone-900">{m.product_name}</td>
-                          <td className="px-5 py-2.5 text-right tabular-nums">{fmtCADfull(m.revenue)}</td>
-                          <td className="px-5 py-2.5 text-right tabular-nums text-stone-500">{fmtCADfull(m.cost)}</td>
-                          <td className={`px-5 py-2.5 text-right tabular-nums font-semibold ${m.margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                            {fmtCADfull(m.margin)}
-                          </td>
-                          <td className={`px-5 py-2.5 text-right tabular-nums ${m.margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                            {m.margin_pct}%
-                          </td>
-                          <td className="px-5 py-2.5 text-right tabular-nums bg-emerald-50/40 text-stone-800">
-                            {fmtCADfull(m.revenue_paid)}
-                          </td>
-                          <td className={`px-5 py-2.5 text-right tabular-nums bg-emerald-50/40 font-semibold ${m.margin_paid >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                            {fmtCADfull(m.margin_paid)}
-                            <span className="ml-1 text-[10px] font-normal text-stone-500">({m.margin_paid_pct}%)</span>
-                          </td>
-                        </tr>
+                        <div key={m.product_id} className="px-5 py-4">
+                          <div className="font-semibold text-stone-900 mb-2">{m.product_name}</div>
+                          <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+                            <dt className="text-stone-500">{t('dashboard.margin.revenue')}</dt>
+                            <dd className="text-right tabular-nums font-medium">{fmtCADfull(m.revenue)}</dd>
+
+                            <dt className="text-stone-500">{t('dashboard.margin.cost')}</dt>
+                            <dd className="text-right tabular-nums text-stone-500">{fmtCADfull(m.cost)}</dd>
+
+                            <dt className="text-stone-500">{t('dashboard.margin.margin')}</dt>
+                            <dd className={`text-right tabular-nums font-semibold ${m.margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                              {fmtCADfull(m.margin)} <span className="text-xs font-normal">({m.margin_pct}%)</span>
+                            </dd>
+
+                            <dt className="text-emerald-700 font-medium">{t('dashboard.margin.paid_margin')}</dt>
+                            <dd className={`text-right tabular-nums font-semibold ${m.margin_paid >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                              {fmtCADfull(m.margin_paid)} <span className="text-xs font-normal">({m.margin_paid_pct}%)</span>
+                            </dd>
+                          </dl>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+
+                    {/* DESKTOP: table dense classique */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full text-sm min-w-[720px]">
+                        <thead className="bg-stone-50 text-[10px] uppercase tracking-wider text-stone-500">
+                          <tr>
+                            <th className="text-left px-5 py-2.5">{t('dashboard.margin.product')}</th>
+                            <th className="text-right px-5 py-2.5">{t('dashboard.margin.revenue')}</th>
+                            <th className="text-right px-5 py-2.5">{t('dashboard.margin.cost')}</th>
+                            <th className="text-right px-5 py-2.5">{t('dashboard.margin.margin')}</th>
+                            <th className="text-right px-5 py-2.5">%</th>
+                            <th className="text-right px-5 py-2.5 bg-emerald-50/60 text-emerald-700">{t('dashboard.margin.paid_revenue')}</th>
+                            <th className="text-right px-5 py-2.5 bg-emerald-50/60 text-emerald-700">{t('dashboard.margin.paid_margin')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.margin_by_product.map(m => (
+                            <tr key={m.product_id} className="border-t border-stone-200">
+                              <td className="px-5 py-2.5 font-medium text-stone-900">{m.product_name}</td>
+                              <td className="px-5 py-2.5 text-right tabular-nums">{fmtCADfull(m.revenue)}</td>
+                              <td className="px-5 py-2.5 text-right tabular-nums text-stone-500">{fmtCADfull(m.cost)}</td>
+                              <td className={`px-5 py-2.5 text-right tabular-nums font-semibold ${m.margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                {fmtCADfull(m.margin)}
+                              </td>
+                              <td className={`px-5 py-2.5 text-right tabular-nums ${m.margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                {m.margin_pct}%
+                              </td>
+                              <td className="px-5 py-2.5 text-right tabular-nums bg-emerald-50/40 text-stone-800">
+                                {fmtCADfull(m.revenue_paid)}
+                              </td>
+                              <td className={`px-5 py-2.5 text-right tabular-nums bg-emerald-50/40 font-semibold ${m.margin_paid >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                {fmtCADfull(m.margin_paid)}
+                                <span className="ml-1 text-[10px] font-normal text-stone-500">({m.margin_paid_pct}%)</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
             </CardBody>
           </Card>
