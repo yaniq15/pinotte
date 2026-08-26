@@ -9,19 +9,22 @@ import { login, loginWithGoogle, getAuthConfig } from '../api/auth'
 import { setToken } from '../hooks/useAuth'
 import { useGoogleSignIn } from '../hooks/useGoogleSignIn'
 import { BRAND } from '../lib/brand'
+import { useT, useLang } from '../lib/i18n'
 
-const schema = z.object({
-  email: z.string().email('Email invalide'),
-  password: z.string().min(1, 'Mot de passe requis'),
-})
-
-type FormData = z.infer<typeof schema>
+type FormData = { email: string; password: string }
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const t = useT()
+  const [lang] = useLang()
   const [serverError, setServerError] = useState<string | null>(null)
   const googleBtnRef = useRef<HTMLDivElement>(null)
+
+  const schema = z.object({
+    email: z.string().email(t('validation.email_invalid')),
+    password: z.string().min(1, t('validation.password_required')),
+  })
 
   // Récupère la config publique du backend (signup ouvert ? Google activé ?)
   const authConfig = useQuery({ queryKey: ['auth-config'], queryFn: getAuthConfig })
@@ -43,7 +46,7 @@ export default function LoginPage() {
       navigate('/')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Connexion Google impossible')
+      setServerError(msg || t('auth.google_connect_error'))
     }
   }
 
@@ -75,7 +78,7 @@ export default function LoginPage() {
       navigate('/')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Connexion impossible')
+      setServerError(msg || t('auth.login_error'))
     }
   }
 
@@ -113,7 +116,7 @@ export default function LoginPage() {
         <PinotteWordmark size="md" />
         <div className="hidden sm:inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-chika-brown/55">
           <Sparkles size={12} className="text-chika-paprika" />
-          PME alimentaire OS
+          {t('auth.pme_badge')}
         </div>
       </header>
 
@@ -124,7 +127,7 @@ export default function LoginPage() {
           {/* Eyebrow */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 ring-1 ring-chika-paprika/30 backdrop-blur-md text-[11px] font-medium text-chika-paprikaDeep tracking-wide shadow-sm">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-chika-paprika animate-pulse" />
-            Nouveau — Export comptable XLSX
+            {t('auth.badge_new')}
           </div>
 
           {/* Headline (gradient subtil paprikaDeep -> paprika) */}
@@ -136,14 +139,12 @@ export default function LoginPage() {
                   'linear-gradient(135deg, #4A2218 0%, #6B3320 60%, #9B3A1A 100%)',
               }}
             >
-              L'OS de votre
-              <br />
-              entreprise alimentaire.
+              {lang === 'en' ? BRAND.taglineEn : BRAND.tagline}
             </span>
           </h1>
 
           <p className="mt-6 text-lg text-chika-brown/65 max-w-xl leading-relaxed">
-            Catalogue, ventes, marges et comptabilité — dans une seule app pensée pour les PME du Québec.
+            {t('auth.subtitle_long')}
           </p>
 
           {/* Mockup flottant (carte glass blanche avec faux KPIs) */}
@@ -157,9 +158,9 @@ export default function LoginPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <MockKpi icon={TrendingUp} label="Revenus" value="14 280 $" tone="emerald" />
-                  <MockKpi icon={TrendingDown} label="Dépenses" value="6 410 $" tone="rose" />
-                  <MockKpi icon={Sparkles} label="Marge nette" value="55%" tone="ocre" />
+                  <MockKpi icon={TrendingUp} label={t('auth.mock.revenue')} value="14 280 $" tone="emerald" />
+                  <MockKpi icon={TrendingDown} label={t('auth.mock.expenses')} value="6 410 $" tone="rose" />
+                  <MockKpi icon={Sparkles} label={t('auth.mock.margin')} value="55%" tone="ocre" />
                 </div>
                 {/* Mini chart synthétique */}
                 <div className="mt-5 flex items-end gap-1.5 h-14">
@@ -177,14 +178,14 @@ export default function LoginPage() {
               </div>
               <div className="absolute -right-10 -bottom-8 w-56 glass-card-light rounded-xl p-3 animate-float-slow-delay">
                 <div className="text-[10px] uppercase tracking-widest text-chika-brown/55 mb-1.5">
-                  Taxes QC — net à remettre
+                  {t('auth.mock.tax_label')}
                 </div>
                 <div className="text-2xl font-bold bg-clip-text text-transparent" style={{
                   backgroundImage: 'linear-gradient(135deg, #C5532E 0%, #E89B27 100%)',
                 }}>
                   2 138,42 $
                 </div>
-                <div className="mt-1 text-[10px] text-chika-brown/50">TPS + TVQ · trimestre courant</div>
+                <div className="mt-1 text-[10px] text-chika-brown/50">{t('auth.mock.tax_sub')}</div>
               </div>
             </div>
           </div>
@@ -194,9 +195,9 @@ export default function LoginPage() {
         <div className="lg:pl-6">
           <div className="glass-card-light rounded-3xl p-7 sm:p-9 max-w-md ml-auto">
             <div className="mb-7">
-              <h2 className="font-display text-3xl font-bold text-chika-brown">Bienvenue</h2>
+              <h2 className="font-display text-3xl font-bold text-chika-brown">{t('auth.welcome')}</h2>
               <p className="text-sm text-chika-brown/60 mt-1.5">
-                Connecte-toi à ton espace de gestion.
+                {t('auth.welcome_sub')}
               </p>
             </div>
 
@@ -215,11 +216,11 @@ export default function LoginPage() {
                   type: 'email',
                   autoComplete: 'email',
                   autoFocus: true,
-                  placeholder: 'toi@entreprise.com',
+                  placeholder: t('auth.email_placeholder'),
                 }}
               />
               <InputField
-                label="Mot de passe"
+                label={t('auth.password_label')}
                 error={errors.password?.message}
                 inputProps={{
                   ...register('password'),
@@ -249,7 +250,7 @@ export default function LoginPage() {
                     animation: 'shine-sweep 1.4s ease-in-out',
                   }}
                 />
-                <span className="relative">{isSubmitting ? 'Connexion…' : 'Se connecter'}</span>
+                <span className="relative">{isSubmitting ? t('auth.connecting') : t('auth.login_button')}</span>
                 {!isSubmitting && (
                   <ArrowRight size={16} className="relative transition group-hover:translate-x-0.5" />
                 )}
@@ -260,7 +261,7 @@ export default function LoginPage() {
                   to="/forgot-password"
                   className="text-xs text-chika-brown/60 hover:text-chika-paprika transition"
                 >
-                  Mot de passe oublié ?
+                  {t('auth.forgot_password')}
                 </Link>
               </div>
             </form>
@@ -270,7 +271,7 @@ export default function LoginPage() {
               <>
                 <div className="my-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-chika-brown/18" />
-                  <span className="text-[10px] uppercase tracking-widest text-chika-brown/45">ou</span>
+                  <span className="text-[10px] uppercase tracking-widest text-chika-brown/45">{t('auth.or')}</span>
                   <div className="h-px flex-1 bg-chika-brown/18" />
                 </div>
                 <div className="flex justify-center">
@@ -288,42 +289,42 @@ export default function LoginPage() {
               <>
                 <div className="my-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-chika-brown/18" />
-                  <span className="text-[10px] uppercase tracking-widest text-chika-brown/45">ou</span>
+                  <span className="text-[10px] uppercase tracking-widest text-chika-brown/45">{t('auth.or')}</span>
                   <div className="h-px flex-1 bg-chika-brown/18" />
                 </div>
                 <p className="text-center text-sm text-chika-brown/70">
-                  Pas encore de compte ?{' '}
+                  {t('auth.no_account')}{' '}
                   <Link
                     to="/register"
                     className="text-chika-paprika font-semibold hover:text-chika-paprikaDeep transition"
                   >
-                    Créer un compte →
+                    {t('auth.create_account')}
                   </Link>
                 </p>
               </>
             )}
             {authConfig.data && !authConfig.data.public_signup_enabled && (
               <p className="text-center text-[11px] text-chika-brown/50 mt-6">
-                L'inscription est sur invitation. Demande à un administrateur.
+                {t('auth.invite_only')}
               </p>
             )}
           </div>
 
           {/* 3 micro-features sous le form */}
           <ul className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-md ml-auto">
-            <MicroFeature icon={Boxes} label="Catalogue & inventaire" />
-            <MicroFeature icon={TrendingUp} label="Ventes & marges" />
-            <MicroFeature icon={FileSpreadsheet} label="Export comptable" />
+            <MicroFeature icon={Boxes} label={t('auth.micro.catalog')} />
+            <MicroFeature icon={TrendingUp} label={t('auth.micro.sales')} />
+            <MicroFeature icon={FileSpreadsheet} label={t('auth.micro.export')} />
           </ul>
         </div>
       </div>
 
       {/* ── Footer ── */}
       <footer className="relative z-10 px-6 lg:px-12 pb-6 text-[11px] text-chika-brown/50 flex flex-wrap items-center justify-between gap-2">
-        <div>© {new Date().getFullYear()} {BRAND.name} · Tous droits réservés</div>
+        <div>© {new Date().getFullYear()} {BRAND.name} · {t('auth.footer_rights')}</div>
         <div className="inline-flex items-center gap-2">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Fait au Québec 🍁 · Données chiffrées et hébergées au Canada
+          {t('auth.footer_made_in_qc')}
         </div>
       </footer>
     </div>

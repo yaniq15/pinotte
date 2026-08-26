@@ -4,8 +4,10 @@ import { useMutation } from '@tanstack/react-query'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { requestPasswordReset } from '../api/auth'
 import { PinotteWordmark } from './LoginPage'
+import { useT } from '../lib/i18n'
 
 export default function ForgotPasswordPage() {
+  const t = useT()
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
@@ -32,33 +34,33 @@ export default function ForgotPasswordPage() {
             to="/login"
             className="inline-flex items-center gap-1.5 text-sm text-stone-600 hover:text-chika-paprika mb-6 transition"
           >
-            <ArrowLeft size={14} /> Retour au login
+            <ArrowLeft size={14} /> {t('auth.back_to_login')}
           </Link>
 
           {submitted ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-emerald-700">
                 <CheckCircle2 size={22} />
-                <h1 className="text-xl font-bold font-serif">Email envoyé</h1>
+                <h1 className="text-xl font-bold font-serif">{t('auth.email_sent')}</h1>
               </div>
               <p className="text-sm text-stone-700">
-                Si l'email <strong>{email}</strong> est enregistré, tu recevras un lien de réinitialisation dans quelques minutes.
+                {t('auth.forgot.sent_prefix')} <strong>{email}</strong> {t('auth.forgot.sent_suffix')}
               </p>
               <p className="text-sm text-stone-600">
-                Vérifie aussi tes spams. Le lien est valide pendant <strong>24 heures</strong>.
+                {t('auth.forgot.spam_prefix')} <strong>{t('auth.forgot.hours_24')}</strong>.
               </p>
               <Link
                 to="/login"
                 className="inline-block mt-4 px-4 py-2 text-sm font-medium rounded-md bg-stone-800 text-white hover:bg-stone-700 transition"
               >
-                Retourner au login
+                {t('auth.return_to_login')}
               </Link>
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold font-serif mb-2">Mot de passe oublié ?</h1>
+              <h1 className="text-2xl font-bold font-serif mb-2">{t('auth.forgot.title')}</h1>
               <p className="text-sm text-stone-600 mb-6">
-                Entre ton email et nous t'enverrons un lien pour choisir un nouveau mot de passe.
+                {t('auth.forgot.subtitle')}
               </p>
 
               <form onSubmit={onSubmit} className="space-y-4">
@@ -70,7 +72,7 @@ export default function ForgotPasswordPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="toi@entreprise.com"
+                      placeholder={t('auth.email_placeholder')}
                       required
                       autoFocus
                       className="w-full pl-10 pr-3 py-2.5 text-sm rounded-md ring-1 ring-stone-300 focus:ring-2 focus:ring-chika-paprika focus:outline-none"
@@ -83,7 +85,7 @@ export default function ForgotPasswordPage() {
                   disabled={mut.isPending || !email.trim()}
                   className="w-full py-2.5 rounded-md bg-gradient-to-r from-chika-ocre to-chika-paprika text-white font-semibold shadow-md hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {mut.isPending ? 'Envoi...' : 'Envoyer le lien'}
+                  {mut.isPending ? t('auth.sending') : t('auth.send_link')}
                 </button>
               </form>
             </>

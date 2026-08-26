@@ -46,6 +46,7 @@ export default function AppLayout() {
   const location = useLocation()
   const qc = useQueryClient()
   const t = useT()
+  const [lang] = useLang()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -83,7 +84,7 @@ export default function AppLayout() {
         <div className="px-5 py-5 border-b border-stone-200">
           <PinotteWordmark size="md" />
           <div className="text-[10px] uppercase tracking-widest text-stone-400 mt-1.5">
-            {BRAND.tagline}
+            {lang === 'en' ? BRAND.taglineEn : BRAND.tagline}
           </div>
         </div>
 

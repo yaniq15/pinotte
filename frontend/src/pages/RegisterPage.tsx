@@ -7,19 +7,22 @@ import { useQueryClient } from '@tanstack/react-query'
 import { register as registerApi } from '../api/auth'
 import { setToken } from '../hooks/useAuth'
 import { BRAND } from '../lib/brand'
+import { useT } from '../lib/i18n'
 
-const schema = z.object({
-  name: z.string().min(1, 'Nom requis').max(100),
-  email: z.string().email('Email invalide'),
-  password: z.string().min(8, 'Au moins 8 caractères').max(72, 'Maximum 72 caractères'),
-})
-
-type FormData = z.infer<typeof schema>
+type FormData = { name: string; email: string; password: string }
 
 export default function RegisterPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const t = useT()
   const [serverError, setServerError] = useState<string | null>(null)
+
+  const schema = z.object({
+    name: z.string().min(1, t('validation.name_required')).max(100),
+    email: z.string().email(t('validation.email_invalid')),
+    password: z.string().min(8, t('validation.password_min8')).max(72, t('validation.password_max72')),
+  })
+
   const { register: rhfRegister, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
@@ -33,7 +36,7 @@ export default function RegisterPage() {
       navigate('/')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Inscription impossible')
+      setServerError(msg || t('auth.register_error'))
     }
   }
 
@@ -46,7 +49,7 @@ export default function RegisterPage() {
           <img src={BRAND.assets.logoCream} alt={BRAND.name}
                className="h-20 sm:h-28 mx-auto drop-shadow-lg" />
           <p className="mt-4 text-chika-cream font-display italic text-lg sm:text-xl tracking-wide">
-            Rejoins l'aventure {BRAND.name}
+            {t('auth.register.join_prefix')} {BRAND.name} {t('auth.register.join_suffix')}
           </p>
           <div className="mt-8 flex justify-center gap-3">
             {BRAND.products.map((p) => (
@@ -64,8 +67,8 @@ export default function RegisterPage() {
           <div className="text-center mb-6">
             <img src={BRAND.assets.logoPaprika} alt={BRAND.name}
                  className="h-12 mx-auto lg:hidden mb-3" />
-            <h2 className="text-2xl font-bold text-chika-brown font-display">Créer un compte</h2>
-            <p className="text-sm text-chika-brown/60 mt-1">Accès propriétaire Chika</p>
+            <h2 className="text-2xl font-bold text-chika-brown font-display">{t('auth.register.title')}</h2>
+            <p className="text-sm text-chika-brown/60 mt-1">{t('auth.register.subtitle_prefix')} {BRAND.name}</p>
           </div>
 
           {serverError && (
@@ -77,7 +80,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-chika-brown/70 mb-1.5">
-                Nom
+                {t('auth.field_name')}
               </label>
               <input {...rhfRegister('name')} autoFocus
                      className="w-full px-3 py-2.5 border border-chika-cream rounded-lg focus:ring-2 focus:ring-chika-paprika focus:border-chika-paprika focus:outline-none text-chika-brown" />
@@ -93,7 +96,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-chika-brown/70 mb-1.5">
-                Mot de passe
+                {t('auth.password_label')}
               </label>
               <input {...rhfRegister('password')} type="password" autoComplete="new-password"
                      className="w-full px-3 py-2.5 border border-chika-cream rounded-lg focus:ring-2 focus:ring-chika-paprika focus:border-chika-paprika focus:outline-none text-chika-brown" />
@@ -102,14 +105,14 @@ export default function RegisterPage() {
 
             <button type="submit" disabled={isSubmitting}
                     className="w-full bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-chika-paprika/30">
-              {isSubmitting ? 'Création…' : 'Créer mon compte'}
+              {isSubmitting ? t('auth.creating') : t('auth.create_account_button')}
             </button>
           </form>
 
           <p className="text-center text-xs text-chika-brown/60 mt-5">
-            Déjà un compte ?{' '}
+            {t('auth.already_account')}{' '}
             <Link to="/login" className="text-chika-paprika font-bold hover:underline">
-              Se connecter
+              {t('auth.login_button')}
             </Link>
           </p>
         </div>

@@ -90,7 +90,7 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
-          <CardHeader title={`À propos de ${BRAND.name}`} subtitle={BRAND.tagline} />
+          <CardHeader title={`À propos de ${BRAND.name}`} subtitle={lang === 'en' ? BRAND.taglineEn : BRAND.tagline} />
           <CardBody className="space-y-3 text-sm text-stone-700">
             <p>
               {BRAND.name} gère ton catalogue de produits, lots de production, ventes (courtier + magasin direct),

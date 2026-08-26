@@ -4,8 +4,10 @@ import { useMutation } from '@tanstack/react-query'
 import { KeyRound, Eye, EyeOff, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { confirmPasswordReset } from '../api/auth'
 import { PinotteWordmark } from './LoginPage'
+import { useT } from '../lib/i18n'
 
 export default function ResetPasswordPage() {
+  const t = useT()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('token') || ''
@@ -24,7 +26,7 @@ export default function ResetPasswordPage() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(msg || 'Erreur — réessaie ou demande un nouveau lien')
+      setError(msg || t('validation.reset_generic_error'))
     },
   })
 
@@ -32,15 +34,15 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError(null)
     if (newPw.length < 8) {
-      setError('Le mot de passe doit faire au moins 8 caractères')
+      setError(t('validation.password_min8_chars'))
       return
     }
     if (!/\d/.test(newPw)) {
-      setError('Le mot de passe doit contenir au moins 1 chiffre')
+      setError(t('validation.password_needs_digit'))
       return
     }
     if (newPw !== confirmPw) {
-      setError('La confirmation ne correspond pas')
+      setError(t('validation.password_mismatch'))
       return
     }
     mut.mutate()
@@ -51,15 +53,15 @@ export default function ResetPasswordPage() {
       <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-[#FFFAF1] to-[#FDF1DD] px-4">
         <div className="max-w-md w-full rounded-2xl bg-white shadow-xl ring-1 ring-stone-200 p-8 text-center">
           <AlertTriangle size={36} className="text-amber-500 mx-auto mb-3" />
-          <h1 className="text-xl font-bold font-serif mb-2 text-chika-brown">Lien invalide</h1>
+          <h1 className="text-xl font-bold font-serif mb-2 text-chika-brown">{t('auth.invalid_link')}</h1>
           <p className="text-sm text-stone-600 mb-6">
-            Le lien ne contient pas de token. Demande un nouveau lien de réinitialisation.
+            {t('auth.invalid_link_body')}
           </p>
           <Link
             to="/forgot-password"
             className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-stone-800 text-white hover:bg-stone-700 transition"
           >
-            Demander un nouveau lien
+            {t('auth.request_new_link')}
           </Link>
         </div>
       </div>
@@ -77,32 +79,36 @@ export default function ResetPasswordPage() {
           {done ? (
             <div className="text-center space-y-4">
               <CheckCircle2 size={40} className="text-emerald-600 mx-auto" />
-              <h1 className="text-xl font-bold font-serif">Mot de passe changé</h1>
+              <h1 className="text-xl font-bold font-serif">{t('auth.password_changed')}</h1>
               <p className="text-sm text-stone-600">
-                Tu vas être redirigé vers la page de login dans 3 secondes...
+                {t('auth.redirect_notice')}
               </p>
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold font-serif mb-2">Nouveau mot de passe</h1>
+              <h1 className="text-2xl font-bold font-serif mb-2">{t('auth.new_password_title')}</h1>
               <p className="text-sm text-stone-600 mb-6">
-                Choisis un nouveau mot de passe pour ton compte. Min 8 caractères + au moins 1 chiffre.
+                {t('auth.new_password_subtitle')}
               </p>
 
               <form onSubmit={onSubmit} className="space-y-4">
                 <PasswordField
-                  label="Nouveau mot de passe"
+                  label={t('auth.new_password_label')}
                   value={newPw}
                   onChange={setNewPw}
                   show={show}
                   onToggle={() => setShow(s => !s)}
+                  showLabel={t('auth.show_password')}
+                  hideLabel={t('auth.hide_password')}
                 />
                 <PasswordField
-                  label="Confirmer"
+                  label={t('auth.confirm_label')}
                   value={confirmPw}
                   onChange={setConfirmPw}
                   show={show}
                   onToggle={() => setShow(s => !s)}
+                  showLabel={t('auth.show_password')}
+                  hideLabel={t('auth.hide_password')}
                 />
                 {error && (
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">⚠ {error}</p>
@@ -113,7 +119,7 @@ export default function ResetPasswordPage() {
                   className="w-full py-2.5 rounded-md bg-gradient-to-r from-chika-ocre to-chika-paprika text-white font-semibold shadow-md hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                 >
                   <KeyRound size={16} />
-                  {mut.isPending ? 'Mise à jour...' : 'Changer le mot de passe'}
+                  {mut.isPending ? t('auth.updating') : t('auth.change_password_button')}
                 </button>
               </form>
             </>
@@ -124,12 +130,14 @@ export default function ResetPasswordPage() {
   )
 }
 
-function PasswordField({ label, value, onChange, show, onToggle }: {
+function PasswordField({ label, value, onChange, show, onToggle, showLabel, hideLabel }: {
   label: string
   value: string
   onChange: (v: string) => void
   show: boolean
   onToggle: () => void
+  showLabel: string
+  hideLabel: string
 }) {
   return (
     <div>
@@ -147,7 +155,7 @@ function PasswordField({ label, value, onChange, show, onToggle }: {
           onClick={onToggle}
           tabIndex={-1}
           className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-stone-400 hover:text-stone-600 transition"
-          aria-label={show ? 'Masquer' : 'Afficher'}
+          aria-label={show ? hideLabel : showLabel}
         >
           {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
