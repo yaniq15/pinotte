@@ -230,7 +230,7 @@ function describeLine(it: SaleItem): string {
     return `+${it.quantity_boxes} lot${it.quantity_boxes > 1 ? 's' : ''} révisés — ${it.product_name}`
   }
   if (it.line_type === 'LOSS_ADJUSTMENT') {
-    return `−${it.quantity_boxes} bte${it.quantity_boxes > 1 ? 's' : ''} perte — ${it.product_name}`
+    return `−${it.quantity_boxes} unité${it.quantity_boxes > 1 ? 's' : ''} perte — ${it.product_name}`
   }
   return `${it.quantity_boxes}× ${it.product_name}`
 }
@@ -577,18 +577,21 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
 
 function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => void; onSaved: () => void }) {
   const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
-  const [boxesLost, setBoxesLost] = useState<Record<number, number>>({})
+  const [unitsLost, setUnitsLost] = useState<Record<number, number>>({})
   const [reason, setReason] = useState('')
   const [serverError, setServerError] = useState<string | null>(null)
 
+  const upbOf = (it: SaleItem) => it.product_units_per_box || 1
+  const perUnitPrice = (it: SaleItem) => Number(it.unit_price) / upbOf(it)
+
   const activeLines = originalItems
-    .map(it => ({ item: it, lost: boxesLost[it.id] ?? 0 }))
+    .map(it => ({ item: it, lost: unitsLost[it.id] ?? 0 }))
     .filter(l => l.lost > 0)
-  const totalCredit = activeLines.reduce((s, l) => s + l.lost * Number(l.item.unit_price), 0)
+  const totalCredit = activeLines.reduce((s, l) => s + l.lost * perUnitPrice(l.item), 0)
 
   const mut = useMutation({
     mutationFn: () => reviseLoss(sale.id, {
-      lines: activeLines.map(l => ({ item_id: l.item.id, boxes_lost: l.lost, reason: reason.trim() })),
+      lines: activeLines.map(l => ({ item_id: l.item.id, units_lost: l.lost, reason: reason.trim() })),
     }),
     onSuccess: onSaved,
     onError: (err: unknown) => {
@@ -608,27 +611,33 @@ function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: ()
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         <p className="text-xs text-stone-500">
-          Crédite le client pour des caisses perdues/endommagées sur une facture déjà émise.
-          Le nouveau total remplace tout de suite l'ancien partout.
+          Crédite le client pour des unités (sacs) perdues/endommagées sur une facture déjà émise —
+          pas besoin qu'une caisse entière soit perdue. Le nouveau total remplace tout de suite l'ancien partout.
         </p>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
         <div className="space-y-2">
-          {originalItems.map(it => (
-            <div key={it.id} className="grid grid-cols-[1fr,90px,90px,90px] gap-2 items-center text-sm">
-              <div className="text-stone-800">
-                {it.product_name}
-                <div className="text-[10px] text-stone-400">{it.quantity_boxes} caisses facturées · {fmtCAD(it.unit_price)}/caisse</div>
+          {originalItems.map(it => {
+            const upb = upbOf(it)
+            const totalUnits = it.quantity_boxes * upb
+            return (
+              <div key={it.id} className="grid grid-cols-[1fr,90px,90px,90px] gap-2 items-center text-sm">
+                <div className="text-stone-800">
+                  {it.product_name}
+                  <div className="text-[10px] text-stone-400">
+                    {it.quantity_boxes} caisses facturées ({totalUnits} unités) · {fmtCAD(perUnitPrice(it))}/unité
+                  </div>
+                </div>
+                <input type="number" min="0" max={totalUnits} value={unitsLost[it.id] ?? 0}
+                  onChange={e => setUnitsLost(s => ({ ...s, [it.id]: Math.max(0, Number(e.target.value)) }))}
+                  className={`${inputCls} text-right`} />
+                <span className="text-stone-500 text-xs">unités</span>
+                <span className="text-right font-semibold tabular-nums text-red-600">
+                  {(unitsLost[it.id] ?? 0) > 0 ? `−${fmtCAD((unitsLost[it.id] ?? 0) * perUnitPrice(it))}` : '—'}
+                </span>
               </div>
-              <input type="number" min="0" max={it.quantity_boxes} value={boxesLost[it.id] ?? 0}
-                onChange={e => setBoxesLost(s => ({ ...s, [it.id]: Math.max(0, Number(e.target.value)) }))}
-                className={`${inputCls} text-right`} />
-              <span className="text-stone-500 text-xs">caisses</span>
-              <span className="text-right font-semibold tabular-nums text-red-600">
-                {(boxesLost[it.id] ?? 0) > 0 ? `−${fmtCAD((boxesLost[it.id] ?? 0) * Number(it.unit_price))}` : '—'}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <Field label="Raison de la perte">

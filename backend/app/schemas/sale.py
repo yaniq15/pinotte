@@ -28,6 +28,7 @@ class SaleItemRead(BaseModel):
     product_name: Optional[str] = None
     product_sku: Optional[str] = None
     product_taxable: bool = False  # remonté depuis Product pour calcul TPS/TVQ par ligne
+    product_units_per_box: Optional[int] = None  # remonté depuis Product pour révision de perte par unité
 
 
 class SaleCreate(BaseModel):
@@ -57,7 +58,7 @@ class LotPriceRevisionRequest(BaseModel):
 
 class LossRevisionLine(BaseModel):
     item_id: int  # id de la ligne SaleItem (line_type=PRODUCT) d'origine visée
-    boxes_lost: int = Field(..., gt=0)
+    units_lost: int = Field(..., gt=0, description="Nb d'unités (sacs) perdues, pas de caisses")
     reason: str = Field(..., min_length=1, max_length=500)
 
 

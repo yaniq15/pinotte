@@ -15,7 +15,8 @@ SALE_STATUSES = ("PENDING", "DELIVERED", "PAID", "CANCELLED")
 # LOT_ADJUSTMENT = révision de prix par lot déjà fourni (quantity_boxes = nb
 #   de LOTS, pas de caisses ; unit_price = montant $/lot).
 # LOSS_ADJUSTMENT = crédit pour perte déclarée sur une ligne déjà facturée
-#   (quantity_boxes = nb de caisses perdues ; subtotal négatif).
+#   (quantity_boxes = nb d'UNITÉS perdues, pas de caisses ; unit_price =
+#   prix/unité au prorata du prix caisse ; subtotal négatif).
 SALE_ITEM_LINE_TYPES = ("PRODUCT", "LOT_ADJUSTMENT", "LOSS_ADJUSTMENT")
 
 # Valid status transitions (server-enforced)

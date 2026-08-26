@@ -199,6 +199,9 @@ def apply_lot_price_revision(
 
 def apply_loss_revision(db: Session, sale: Sale, lines: list[LossRevisionLine], current: User) -> Sale:
     """Ajoute un crédit LOSS_ADJUSTMENT (subtotal négatif) par ligne visée.
+    La perte se déclare en UNITÉS (sacs), pas en caisses entières — une
+    caisse endommagée n'a souvent que quelques unités abîmées. Le crédit est
+    calculé au prorata du prix caisse : unit_price / units_per_box.
     Pas de mouvement de stock ici : les caisses ont déjà quitté l'inventaire
     via le mouvement SALE d'origine — c'est une correction de facturation
     seulement. Si la perte n'a pas encore été déclarée côté stock, il faut
@@ -208,24 +211,27 @@ def apply_loss_revision(db: Session, sale: Sale, lines: list[LossRevisionLine], 
 
     for line in lines:
         original = _revisable_original_item(sale, line.item_id)
-        already_credited = sum(
+        upb = original.product.units_per_box
+        total_units_invoiced = original.quantity_boxes * upb
+        already_credited_units = sum(
             it.quantity_boxes for it in sale.items
             if it.line_type == "LOSS_ADJUSTMENT" and it.product_id == original.product_id and it.batch_id == original.batch_id
         )
-        if line.boxes_lost + already_credited > original.quantity_boxes:
+        if line.units_lost + already_credited_units > total_units_invoiced:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Impossible de créditer {line.boxes_lost} caisses sur la ligne #{line.item_id} : "
-                    f"seulement {original.quantity_boxes - already_credited} facturées restantes (non déjà créditées)"
+                    f"Impossible de créditer {line.units_lost} unités sur la ligne #{line.item_id} : "
+                    f"seulement {total_units_invoiced - already_credited_units} unités facturées restantes (non déjà créditées)"
                 ),
             )
-        subtotal = -(Decimal(line.boxes_lost) * original.unit_price)
+        credit_per_unit = original.unit_price / Decimal(upb)
+        subtotal = -(Decimal(line.units_lost) * credit_per_unit)
         sale.items.append(SaleItem(
             product_id=original.product_id,
             batch_id=original.batch_id,
-            quantity_boxes=line.boxes_lost,
-            unit_price=original.unit_price,
+            quantity_boxes=line.units_lost,
+            unit_price=credit_per_unit,
             subtotal=subtotal,
             line_type="LOSS_ADJUSTMENT",
             notes=line.reason,

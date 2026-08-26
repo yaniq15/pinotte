@@ -128,7 +128,7 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
                   )}
                 </View>
                 <Text style={styles.colQty}>
-                  {it.quantity_boxes}{it.line_type === 'LOT_ADJUSTMENT' ? ' lot(s)' : it.line_type === 'LOSS_ADJUSTMENT' ? ' caisse(s)' : ''}
+                  {it.quantity_boxes}{it.line_type === 'LOT_ADJUSTMENT' ? ' lot(s)' : it.line_type === 'LOSS_ADJUSTMENT' ? ' unité(s)' : ''}
                 </Text>
                 <Text style={styles.colPrice}>{fmtMoney(Number(it.unit_price))}</Text>
                 <Text style={[styles.colTotal, negative ? { color: '#dc2626' } : {}]}>{fmtMoney(Number(it.subtotal))}</Text>

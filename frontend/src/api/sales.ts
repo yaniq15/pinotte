@@ -15,6 +15,7 @@ export interface SaleItem {
   product_name: string | null
   product_sku: string | null
   product_taxable: boolean
+  product_units_per_box: number | null
 }
 
 export interface Sale {
@@ -78,7 +79,7 @@ export interface LotPriceRevisionPayload {
 }
 
 export interface LossRevisionPayload {
-  lines: { item_id: number; boxes_lost: number; reason: string }[]
+  lines: { item_id: number; units_lost: number; reason: string }[]
 }
 
 export async function reviseLotPrice(saleId: number, payload: LotPriceRevisionPayload): Promise<Sale> {
