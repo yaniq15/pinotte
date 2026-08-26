@@ -5,6 +5,7 @@ export interface Product {
   name: string
   sku: string
   units_per_box: number
+  boxes_per_lot: number | null
   unit_cost: number | string | null
   consumer_price: number | string | null
   store_margin_pct: number | string | null
@@ -24,6 +25,7 @@ export interface ProductPayload {
   name: string
   sku: string
   units_per_box: number
+  boxes_per_lot?: number | null
   unit_cost?: number | null
   consumer_price?: number | null
   store_margin_pct?: number | null

@@ -27,6 +27,7 @@ const schema = z.object({
   name: z.string().min(1, 'Requis'),
   sku: z.string().min(1, 'Requis'),
   units_per_box: z.coerce.number().int().positive('> 0 requis'),
+  boxes_per_lot: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().positive('> 0 requis').optional()),
   unit_cost: optNum(),
   consumer_price: optNum(),
   store_margin_pct: optNum(1),
@@ -227,6 +228,7 @@ function ProductForm({ initial, onClose, onSaved }: {
     defaultValues: initial
       ? {
           name: initial.name, sku: initial.sku, units_per_box: initial.units_per_box,
+          boxes_per_lot: initial.boxes_per_lot ?? undefined,
           unit_cost: initial.unit_cost == null ? undefined : Number(initial.unit_cost),
           consumer_price: initial.consumer_price == null ? undefined : Number(initial.consumer_price),
           store_margin_pct: initial.store_margin_pct == null ? undefined : Number(initial.store_margin_pct),
@@ -299,6 +301,7 @@ function ProductForm({ initial, onClose, onSaved }: {
     mutationFn: async (v: FormData) => {
       const payload: ProductPayload = {
         name: v.name, sku: v.sku, units_per_box: Number(v.units_per_box),
+        boxes_per_lot:    v.boxes_per_lot ?? null,
         unit_cost:        v.unit_cost ?? null,
         consumer_price:   v.consumer_price ?? null,
         store_margin_pct: v.store_margin_pct ?? null,
@@ -364,9 +367,13 @@ function ProductForm({ initial, onClose, onSaved }: {
             <input {...register('sku')} className={`${inputCls} font-mono uppercase`} />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <Field label="Unités par caisse" error={errors.units_per_box?.message}>
             <input type="number" min="1" {...register('units_per_box')} className={inputCls} />
+          </Field>
+          <Field label="Caisses par lot" error={errors.boxes_per_lot?.message}>
+            <input type="number" min="1" placeholder="—" {...register('boxes_per_lot')} className={inputCls} />
+            <p className="mt-1 text-[10px] text-stone-500">Optionnel — active la révision de prix par lot sur les ventes.</p>
           </Field>
           <Field label="Coût unitaire (production)">
             {isEdit ? (

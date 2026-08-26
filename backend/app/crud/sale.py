@@ -10,7 +10,7 @@ from ..models.movement import Movement
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem, STATUS_TRANSITIONS
 from ..models.user import User
-from ..schemas.sale import SaleCreate
+from ..schemas.sale import LossRevisionLine, LotPriceRevisionLine, SaleCreate
 from . import movement as movement_crud
 
 
@@ -147,6 +147,92 @@ def transition_status(
                 movement_date=date.today(),
                 notes=f"Annulation vente #{sale.id}",
             ))
+    db.commit()
+    db.refresh(sale)
+    return sale
+
+
+def _revisable_original_item(sale: Sale, item_id: int) -> SaleItem:
+    """Trouve une ligne PRODUCT d'origine de cette vente (pas une ligne de
+    révision — on ne révise jamais une révision) ou lève une 404/400."""
+    item = next((it for it in sale.items if it.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Ligne #{item_id} introuvable sur cette vente")
+    if item.line_type != "PRODUCT":
+        raise HTTPException(
+            status_code=400,
+            detail=f"La ligne #{item_id} est déjà une révision — impossible de la réviser à nouveau",
+        )
+    return item
+
+
+def apply_lot_price_revision(
+    db: Session, sale: Sale, lines: list[LotPriceRevisionLine], amount_per_lot: Decimal, reason: str, current: User,
+) -> Sale:
+    """Ajoute une ligne LOT_ADJUSTMENT par ligne visée — la facture originale
+    n'est pas touchée, mais total_amount (somme des lignes) reflète tout de
+    suite le vrai montant partout où il est lu (dashboard, PDF, etc.)."""
+    if sale.status == "CANCELLED":
+        raise HTTPException(status_code=400, detail="Impossible de réviser une vente annulée")
+
+    for line in lines:
+        original = _revisable_original_item(sale, line.item_id)
+        subtotal = Decimal(line.lots) * amount_per_lot
+        # .append() (pas db.add) : garde sale.items à jour en mémoire tout de
+        # suite, nécessaire pour recalculer total_amount juste après.
+        sale.items.append(SaleItem(
+            product_id=original.product_id,
+            batch_id=None,
+            quantity_boxes=line.lots,
+            unit_price=amount_per_lot,
+            subtotal=subtotal,
+            line_type="LOT_ADJUSTMENT",
+            notes=reason,
+            created_by=current.id,
+        ))
+
+    sale.total_amount = sum((it.subtotal for it in sale.items), Decimal("0"))
+    db.commit()
+    db.refresh(sale)
+    return sale
+
+
+def apply_loss_revision(db: Session, sale: Sale, lines: list[LossRevisionLine], current: User) -> Sale:
+    """Ajoute un crédit LOSS_ADJUSTMENT (subtotal négatif) par ligne visée.
+    Pas de mouvement de stock ici : les caisses ont déjà quitté l'inventaire
+    via le mouvement SALE d'origine — c'est une correction de facturation
+    seulement. Si la perte n'a pas encore été déclarée côté stock, il faut
+    aussi passer par Mouvements (LOSS) séparément."""
+    if sale.status == "CANCELLED":
+        raise HTTPException(status_code=400, detail="Impossible de réviser une vente annulée")
+
+    for line in lines:
+        original = _revisable_original_item(sale, line.item_id)
+        already_credited = sum(
+            it.quantity_boxes for it in sale.items
+            if it.line_type == "LOSS_ADJUSTMENT" and it.product_id == original.product_id and it.batch_id == original.batch_id
+        )
+        if line.boxes_lost + already_credited > original.quantity_boxes:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Impossible de créditer {line.boxes_lost} caisses sur la ligne #{line.item_id} : "
+                    f"seulement {original.quantity_boxes - already_credited} facturées restantes (non déjà créditées)"
+                ),
+            )
+        subtotal = -(Decimal(line.boxes_lost) * original.unit_price)
+        sale.items.append(SaleItem(
+            product_id=original.product_id,
+            batch_id=original.batch_id,
+            quantity_boxes=line.boxes_lost,
+            unit_price=original.unit_price,
+            subtotal=subtotal,
+            line_type="LOSS_ADJUSTMENT",
+            notes=line.reason,
+            created_by=current.id,
+        ))
+
+    sale.total_amount = sum((it.subtotal for it in sale.items), Decimal("0"))
     db.commit()
     db.refresh(sale)
     return sale

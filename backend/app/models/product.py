@@ -29,6 +29,9 @@ class Product(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     sku: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     units_per_box: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Taille du lot commercial (ex. 10 caisses = 1 lot) — optionnel, sert au
+    # calcul auto du nb de lots lors d'une révision de prix sur une vente.
+    boxes_per_lot: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     unit_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
     # Recipe yield: how many units (jars/bags) does ONE reference batch produce.

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { todayISO } from '../lib/dates'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText } from 'lucide-react'
+import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText, Tag, AlertTriangle } from 'lucide-react'
 import { downloadInvoice } from '../components/Invoice'
 import {
-  listSales, createSale, updateSaleStatus,
-  type SaleStatus, type SalePayload, type SaleItemPayload,
+  listSales, createSale, updateSaleStatus, reviseLotPrice, reviseLoss,
+  type SaleStatus, type SalePayload, type SaleItemPayload, type Sale, type SaleItem,
 } from '../api/sales'
 import { listClients, type Client } from '../api/clients'
 import { listProducts, type Product } from '../api/products'
@@ -35,6 +35,8 @@ export default function SalesPage() {
   const [filterClient, setFilterClient] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [revisingLotPrice, setRevisingLotPrice] = useState<Sale | null>(null)
+  const [revisingLoss, setRevisingLoss] = useState<Sale | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Open the create form automatically if landed via FAB (?new=1)
@@ -129,7 +131,7 @@ export default function SalesPage() {
                         <td className="px-5 py-3 text-stone-700">{fmtDate(s.sale_date)}</td>
                         <td className="px-5 py-3 font-medium text-stone-900">{s.client_name}</td>
                         <td className="px-5 py-3 text-stone-600 hidden sm:table-cell text-xs">
-                          {s.items.map(it => `${it.quantity_boxes}× ${it.product_name}`).join(', ')}
+                          {s.items.map(it => describeLine(it)).join(', ')}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-stone-900">
                           <div className="font-semibold">{fmtCAD(s.total_amount)}<span className="text-[10px] text-stone-400 font-normal ml-0.5">HT</span></div>
@@ -171,6 +173,18 @@ export default function SalesPage() {
                                 Annuler
                               </Button>
                             )}
+                            {s.status !== 'CANCELLED' && (
+                              <>
+                                <Button size="sm" variant="ghost" icon={<Tag size={12} />}
+                                  onClick={() => setRevisingLotPrice(s)}>
+                                  Prix/lot
+                                </Button>
+                                <Button size="sm" variant="ghost" icon={<AlertTriangle size={12} />}
+                                  onClick={() => setRevisingLoss(s)}>
+                                  Perte
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -190,8 +204,35 @@ export default function SalesPage() {
           setShowForm(false)
         }} />
       )}
+
+      {revisingLotPrice && (
+        <LotPriceRevisionModal
+          sale={revisingLotPrice}
+          onClose={() => setRevisingLotPrice(null)}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ['sales'] }); setRevisingLotPrice(null) }}
+        />
+      )}
+
+      {revisingLoss && (
+        <LossRevisionModal
+          sale={revisingLoss}
+          onClose={() => setRevisingLoss(null)}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ['sales'] }); setRevisingLoss(null) }}
+        />
+      )}
     </div>
   )
+}
+
+/** Résumé lisible d'une ligne de vente pour la colonne "Articles". */
+function describeLine(it: SaleItem): string {
+  if (it.line_type === 'LOT_ADJUSTMENT') {
+    return `+${it.quantity_boxes} lot${it.quantity_boxes > 1 ? 's' : ''} révisés — ${it.product_name}`
+  }
+  if (it.line_type === 'LOSS_ADJUSTMENT') {
+    return `−${it.quantity_boxes} bte${it.quantity_boxes > 1 ? 's' : ''} perte — ${it.product_name}`
+  }
+  return `${it.quantity_boxes}× ${it.product_name}`
 }
 
 interface Line {
@@ -406,6 +447,209 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
           <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
             {mut.isPending ? '…' : 'Créer la vente'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => void; onSaved: () => void }) {
+  const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
+  const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
+
+  const [amountPerLot, setAmountPerLot] = useState('5')
+  const [reason, setReason] = useState('')
+  const [lots, setLots] = useState<Record<number, number>>({})
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  // Pré-calcule le nb de lots dès que les produits sont chargés (arrondi au
+  // lot plein inférieur) — l'user peut ensuite ajuster manuellement.
+  useEffect(() => {
+    if (!products.data) return
+    setLots(prev => {
+      const next = { ...prev }
+      for (const it of originalItems) {
+        if (next[it.id] !== undefined) continue
+        const product = products.data!.find(p => p.id === it.product_id)
+        if (product?.boxes_per_lot) {
+          next[it.id] = Math.floor(it.quantity_boxes / product.boxes_per_lot)
+        }
+      }
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products.data])
+
+  const amount = parseFloat(amountPerLot) || 0
+  const eligibleLines = originalItems
+    .map(it => {
+      const product = products.data?.find(p => p.id === it.product_id)
+      return { item: it, product, lotCount: lots[it.id] ?? 0 }
+    })
+    .filter(l => l.product?.boxes_per_lot)
+
+  const activeLines = eligibleLines.filter(l => l.lotCount > 0)
+  const totalImpact = activeLines.reduce((s, l) => s + l.lotCount * amount, 0)
+
+  const mut = useMutation({
+    mutationFn: () => reviseLotPrice(sale.id, {
+      amount_per_lot: amount,
+      reason: reason.trim(),
+      lines: activeLines.map(l => ({ item_id: l.item.id, lots: l.lotCount })),
+    }),
+    onSuccess: onSaved,
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setServerError(msg || 'Erreur')
+    },
+  })
+
+  const noneEligible = products.data && eligibleLines.length === 0
+  const canSubmit = amount > 0 && reason.trim().length > 0 && activeLines.length > 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-900">Réviser le prix — vente #{sale.id}</h3>
+          <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
+        </div>
+        <p className="text-xs text-stone-500">
+          Applique un montant additionnel par lot déjà fourni. La facture originale n'est pas modifiée —
+          une ligne de révision s'ajoute, et le nouveau total remplace tout de suite l'ancien partout.
+        </p>
+        {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
+
+        {noneEligible && (
+          <div className="px-3 py-2 rounded-lg bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-sm">
+            Aucun produit de cette vente n'a de "caisses par lot" configuré. Va dans <strong>Produits</strong> pour le régler d'abord.
+          </div>
+        )}
+
+        <Field label="Montant par lot ($)">
+          <input type="number" step="0.01" min="0" value={amountPerLot}
+            onChange={e => setAmountPerLot(e.target.value)} className={inputCls} />
+        </Field>
+
+        {eligibleLines.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-stone-700">Lots à facturer par ligne</label>
+            {eligibleLines.map(l => (
+              <div key={l.item.id} className="grid grid-cols-[1fr,90px,90px,90px] gap-2 items-center text-sm">
+                <div className="text-stone-800">
+                  {l.item.product_name}
+                  <div className="text-[10px] text-stone-400">{l.item.quantity_boxes} caisses facturées · {l.product!.boxes_per_lot} caisses/lot</div>
+                </div>
+                <input type="number" min="0" value={l.lotCount}
+                  onChange={e => setLots(s => ({ ...s, [l.item.id]: Math.max(0, Number(e.target.value)) }))}
+                  className={`${inputCls} text-right`} />
+                <span className="text-stone-500 text-xs">lots</span>
+                <span className="text-right font-semibold tabular-nums text-chika-paprika">
+                  {fmtCAD(l.lotCount * amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Field label="Raison de la révision">
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className={inputCls}
+            placeholder="Ex. Le client demande 5$ de plus par lot déjà fourni." />
+        </Field>
+
+        <div className="flex justify-between border-t border-stone-200 pt-3">
+          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">Impact total</span>
+          <span className="text-xl font-bold tabular-nums text-chika-paprika">+{fmtCAD(totalImpact)}</span>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
+          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" disabled={!canSubmit || mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? '…' : 'Appliquer la révision'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => void; onSaved: () => void }) {
+  const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
+  const [boxesLost, setBoxesLost] = useState<Record<number, number>>({})
+  const [reason, setReason] = useState('')
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const activeLines = originalItems
+    .map(it => ({ item: it, lost: boxesLost[it.id] ?? 0 }))
+    .filter(l => l.lost > 0)
+  const totalCredit = activeLines.reduce((s, l) => s + l.lost * Number(l.item.unit_price), 0)
+
+  const mut = useMutation({
+    mutationFn: () => reviseLoss(sale.id, {
+      lines: activeLines.map(l => ({ item_id: l.item.id, boxes_lost: l.lost, reason: reason.trim() })),
+    }),
+    onSuccess: onSaved,
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setServerError(msg || 'Erreur')
+    },
+  })
+
+  const canSubmit = activeLines.length > 0 && reason.trim().length > 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-stone-900">Déclarer une perte — vente #{sale.id}</h3>
+          <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
+        </div>
+        <p className="text-xs text-stone-500">
+          Crédite le client pour des caisses perdues/endommagées sur une facture déjà émise.
+          Le nouveau total remplace tout de suite l'ancien partout.
+        </p>
+        {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
+
+        <div className="space-y-2">
+          {originalItems.map(it => (
+            <div key={it.id} className="grid grid-cols-[1fr,90px,90px,90px] gap-2 items-center text-sm">
+              <div className="text-stone-800">
+                {it.product_name}
+                <div className="text-[10px] text-stone-400">{it.quantity_boxes} caisses facturées · {fmtCAD(it.unit_price)}/caisse</div>
+              </div>
+              <input type="number" min="0" max={it.quantity_boxes} value={boxesLost[it.id] ?? 0}
+                onChange={e => setBoxesLost(s => ({ ...s, [it.id]: Math.max(0, Number(e.target.value)) }))}
+                className={`${inputCls} text-right`} />
+              <span className="text-stone-500 text-xs">caisses</span>
+              <span className="text-right font-semibold tabular-nums text-red-600">
+                {(boxesLost[it.id] ?? 0) > 0 ? `−${fmtCAD((boxesLost[it.id] ?? 0) * Number(it.unit_price))}` : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <Field label="Raison de la perte">
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className={inputCls}
+            placeholder="Ex. Carton endommagé pendant le transport." />
+        </Field>
+
+        <div className="px-3 py-2 rounded-lg bg-stone-50 ring-1 ring-stone-200 text-[11px] text-stone-500">
+          Ceci corrige seulement la facture. Si la perte n'est pas déjà déclarée côté stock, pense aussi à
+          l'ajouter dans <Link to="/mouvements" className="text-chika-paprika underline" onClick={onClose}>Mouvements</Link>.
+        </div>
+
+        <div className="flex justify-between border-t border-stone-200 pt-3">
+          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">Crédit total</span>
+          <span className="text-xl font-bold tabular-nums text-red-600">−{fmtCAD(totalCredit)}</span>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
+          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" variant="danger" disabled={!canSubmit || mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? '…' : 'Appliquer le crédit'}
           </Button>
         </div>
       </div>

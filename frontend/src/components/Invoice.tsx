@@ -108,20 +108,33 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
             <Text style={styles.colPrice}>Prix HT/caisse</Text>
             <Text style={styles.colTotal}>Total HT</Text>
           </View>
-          {sale.items.map(it => (
-            <View key={it.id} style={styles.tableRow}>
-              <View style={styles.colDesc}>
-                <Text style={{ fontWeight: 'bold' }}>{it.product_name || `Produit ${it.product_id}`}</Text>
-                {it.product_sku && <Text style={{ fontSize: 8, color: '#78716c' }}>SKU : {it.product_sku}</Text>}
-                {!it.product_taxable && (
-                  <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>(Détaxé — épicerie QC)</Text>
-                )}
+          {sale.items.map(it => {
+            const isAdjustment = it.line_type !== 'PRODUCT'
+            const negative = Number(it.subtotal) < 0
+            return (
+              <View key={it.id} style={styles.tableRow}>
+                <View style={styles.colDesc}>
+                  <Text style={{ fontWeight: 'bold' }}>
+                    {it.line_type === 'LOT_ADJUSTMENT' && 'Révision de prix — '}
+                    {it.line_type === 'LOSS_ADJUSTMENT' && 'Crédit perte déclarée — '}
+                    {it.product_name || `Produit ${it.product_id}`}
+                  </Text>
+                  {!isAdjustment && it.product_sku && <Text style={{ fontSize: 8, color: '#78716c' }}>SKU : {it.product_sku}</Text>}
+                  {!isAdjustment && !it.product_taxable && (
+                    <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>(Détaxé — épicerie QC)</Text>
+                  )}
+                  {isAdjustment && it.notes && (
+                    <Text style={{ fontSize: 8, color: '#78716c', fontStyle: 'italic' }}>{it.notes}</Text>
+                  )}
+                </View>
+                <Text style={styles.colQty}>
+                  {it.quantity_boxes}{it.line_type === 'LOT_ADJUSTMENT' ? ' lot(s)' : it.line_type === 'LOSS_ADJUSTMENT' ? ' caisse(s)' : ''}
+                </Text>
+                <Text style={styles.colPrice}>{fmtMoney(Number(it.unit_price))}</Text>
+                <Text style={[styles.colTotal, negative ? { color: '#dc2626' } : {}]}>{fmtMoney(Number(it.subtotal))}</Text>
               </View>
-              <Text style={styles.colQty}>{it.quantity_boxes}</Text>
-              <Text style={styles.colPrice}>{fmtMoney(Number(it.unit_price))}</Text>
-              <Text style={styles.colTotal}>{fmtMoney(Number(it.subtotal))}</Text>
-            </View>
-          ))}
+            )
+          })}
         </View>
 
         {/* Totaux */}

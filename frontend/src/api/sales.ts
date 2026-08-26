@@ -1,6 +1,7 @@
 import { api } from '../lib/axios'
 
 export type SaleStatus = 'PENDING' | 'DELIVERED' | 'PAID' | 'CANCELLED'
+export type SaleItemLineType = 'PRODUCT' | 'LOT_ADJUSTMENT' | 'LOSS_ADJUSTMENT'
 
 export interface SaleItem {
   id: number
@@ -9,6 +10,8 @@ export interface SaleItem {
   quantity_boxes: number
   unit_price: number | string
   subtotal: number | string
+  line_type: SaleItemLineType
+  notes: string | null
   product_name: string | null
   product_sku: string | null
   product_taxable: boolean
@@ -64,5 +67,26 @@ export async function createSale(payload: SalePayload): Promise<Sale> {
 
 export async function updateSaleStatus(id: number, status: SaleStatus, payment_date?: string): Promise<Sale> {
   const { data } = await api.patch<Sale>(`/api/sales/${id}/status`, { status, payment_date })
+  return data
+}
+
+// ── Révisions de facture ──────────────────────────────────────────────
+export interface LotPriceRevisionPayload {
+  amount_per_lot: number
+  reason: string
+  lines: { item_id: number; lots: number }[]
+}
+
+export interface LossRevisionPayload {
+  lines: { item_id: number; boxes_lost: number; reason: string }[]
+}
+
+export async function reviseLotPrice(saleId: number, payload: LotPriceRevisionPayload): Promise<Sale> {
+  const { data } = await api.post<Sale>(`/api/sales/${saleId}/revise/lot-price`, payload)
+  return data
+}
+
+export async function reviseLoss(saleId: number, payload: LossRevisionPayload): Promise<Sale> {
+  const { data } = await api.post<Sale>(`/api/sales/${saleId}/revise/loss`, payload)
   return data
 }

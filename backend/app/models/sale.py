@@ -11,6 +11,13 @@ from ..core.database import Base, TimestampMixin
 
 SALE_STATUSES = ("PENDING", "DELIVERED", "PAID", "CANCELLED")
 
+# PRODUCT = ligne vendue normalement (créée avec la vente).
+# LOT_ADJUSTMENT = révision de prix par lot déjà fourni (quantity_boxes = nb
+#   de LOTS, pas de caisses ; unit_price = montant $/lot).
+# LOSS_ADJUSTMENT = crédit pour perte déclarée sur une ligne déjà facturée
+#   (quantity_boxes = nb de caisses perdues ; subtotal négatif).
+SALE_ITEM_LINE_TYPES = ("PRODUCT", "LOT_ADJUSTMENT", "LOSS_ADJUSTMENT")
+
 # Valid status transitions (server-enforced)
 STATUS_TRANSITIONS: dict[str, set[str]] = {
     "PENDING":   {"DELIVERED", "CANCELLED"},
@@ -48,6 +55,9 @@ class SaleItem(Base, TimestampMixin):
     quantity_boxes: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    line_type: Mapped[str] = mapped_column(String(20), default="PRODUCT", server_default="PRODUCT", nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product", lazy="joined")

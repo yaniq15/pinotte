@@ -5,6 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 SaleStatus = Literal["PENDING", "DELIVERED", "PAID", "CANCELLED"]
+SaleItemLineType = Literal["PRODUCT", "LOT_ADJUSTMENT", "LOSS_ADJUSTMENT"]
 
 
 class SaleItemCreate(BaseModel):
@@ -22,6 +23,8 @@ class SaleItemRead(BaseModel):
     quantity_boxes: int
     unit_price: Decimal
     subtotal: Decimal
+    line_type: SaleItemLineType = "PRODUCT"
+    notes: Optional[str] = None
     product_name: Optional[str] = None
     product_sku: Optional[str] = None
     product_taxable: bool = False  # remonté depuis Product pour calcul TPS/TVQ par ligne
@@ -38,6 +41,28 @@ class SaleCreate(BaseModel):
 class SaleStatusUpdate(BaseModel):
     status: SaleStatus
     payment_date: Optional[date] = None
+
+
+# ── Révisions de facture ────────────────────────────────────────────────
+class LotPriceRevisionLine(BaseModel):
+    item_id: int  # id de la ligne SaleItem (line_type=PRODUCT) d'origine visée
+    lots: int = Field(..., gt=0, description="Nb de lots à facturer sur cette ligne (le front pré-calcule via boxes_per_lot, mais l'user peut ajuster)")
+
+
+class LotPriceRevisionRequest(BaseModel):
+    amount_per_lot: Decimal = Field(..., gt=0)
+    reason: str = Field(..., min_length=1, max_length=500)
+    lines: list[LotPriceRevisionLine] = Field(..., min_length=1)
+
+
+class LossRevisionLine(BaseModel):
+    item_id: int  # id de la ligne SaleItem (line_type=PRODUCT) d'origine visée
+    boxes_lost: int = Field(..., gt=0)
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class LossRevisionRequest(BaseModel):
+    lines: list[LossRevisionLine] = Field(..., min_length=1)
 
 
 class SaleRead(BaseModel):
