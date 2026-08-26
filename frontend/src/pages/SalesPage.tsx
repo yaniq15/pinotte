@@ -6,7 +6,7 @@ import { Plus, X, Truck, DollarSign, Ban, Trash2, FileText, Tag, AlertTriangle }
 import { downloadInvoice } from '../components/Invoice'
 import {
   listSales, createSale, updateSaleStatus, reviseLotPrice, reviseLoss,
-  type SaleStatus, type SalePayload, type SaleItemPayload, type Sale, type SaleItem,
+  type SaleStatus, type SalePayload, type SaleItemPayload, type Sale, type SaleItem, type LotRevisionDirection,
 } from '../api/sales'
 import { listClients, type Client } from '../api/clients'
 import { listProducts, type Product } from '../api/products'
@@ -227,7 +227,8 @@ export default function SalesPage() {
 /** Résumé lisible d'une ligne de vente pour la colonne "Articles". */
 function describeLine(it: SaleItem): string {
   if (it.line_type === 'LOT_ADJUSTMENT') {
-    return `+${it.quantity_boxes} lot${it.quantity_boxes > 1 ? 's' : ''} révisés — ${it.product_name}`
+    const sign = Number(it.subtotal) < 0 ? '−' : '+'
+    return `${sign}${it.quantity_boxes} lot${it.quantity_boxes > 1 ? 's' : ''} révisés — ${it.product_name}`
   }
   if (it.line_type === 'LOSS_ADJUSTMENT') {
     return `−${it.quantity_boxes} unité${it.quantity_boxes > 1 ? 's' : ''} perte — ${it.product_name}`
@@ -459,6 +460,7 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
   const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
 
   const [amountPerLot, setAmountPerLot] = useState('5')
+  const [direction, setDirection] = useState<LotRevisionDirection>('CREDIT')
   const [reason, setReason] = useState('')
   const [lots, setLots] = useState<Record<number, number>>({})
   const [serverError, setServerError] = useState<string | null>(null)
@@ -482,6 +484,7 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
   }, [products.data])
 
   const amount = parseFloat(amountPerLot) || 0
+  const sign = direction === 'CREDIT' ? -1 : 1
   const eligibleLines = originalItems
     .map(it => {
       const product = products.data?.find(p => p.id === it.product_id)
@@ -490,11 +493,12 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
     .filter(l => l.product?.boxes_per_lot)
 
   const activeLines = eligibleLines.filter(l => l.lotCount > 0)
-  const totalImpact = activeLines.reduce((s, l) => s + l.lotCount * amount, 0)
+  const totalImpact = activeLines.reduce((s, l) => s + l.lotCount * amount, 0) * sign
 
   const mut = useMutation({
     mutationFn: () => reviseLotPrice(sale.id, {
       amount_per_lot: amount,
+      direction,
       reason: reason.trim(),
       lines: activeLines.map(l => ({ item_id: l.item.id, lots: l.lotCount })),
     }),
@@ -517,7 +521,7 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         <p className="text-xs text-stone-500">
-          Applique un montant additionnel par lot déjà fourni. La facture originale n'est pas modifiée —
+          Applique un montant par lot déjà fourni. La facture originale n'est pas modifiée —
           une ligne de révision s'ajoute, et le nouveau total remplace tout de suite l'ancien partout.
         </p>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
@@ -527,6 +531,19 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
             Aucun produit de cette vente n'a de "caisses par lot" configuré. Va dans <strong>Produits</strong> pour le régler d'abord.
           </div>
         )}
+
+        <Field label="Type de révision">
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setDirection('CREDIT')}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ring-1 ${direction === 'CREDIT' ? 'bg-red-50 ring-red-300 text-red-700' : 'ring-stone-300 text-stone-600'}`}>
+              − Rabais (crédit client)
+            </button>
+            <button type="button" onClick={() => setDirection('SURCHARGE')}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ring-1 ${direction === 'SURCHARGE' ? 'bg-chika-paprika/10 ring-chika-paprika text-chika-paprika' : 'ring-stone-300 text-stone-600'}`}>
+              + Supplément facturé
+            </button>
+          </div>
+        </Field>
 
         <Field label="Montant par lot ($)">
           <input type="number" step="0.01" min="0" value={amountPerLot}
@@ -546,8 +563,8 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
                   onChange={e => setLots(s => ({ ...s, [l.item.id]: Math.max(0, Number(e.target.value)) }))}
                   className={`${inputCls} text-right`} />
                 <span className="text-stone-500 text-xs">lots</span>
-                <span className="text-right font-semibold tabular-nums text-chika-paprika">
-                  {fmtCAD(l.lotCount * amount)}
+                <span className={`text-right font-semibold tabular-nums ${direction === 'CREDIT' ? 'text-red-600' : 'text-chika-paprika'}`}>
+                  {direction === 'CREDIT' ? '−' : '+'}{fmtCAD(l.lotCount * amount)}
                 </span>
               </div>
             ))}
@@ -556,12 +573,14 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
 
         <Field label="Raison de la révision">
           <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className={inputCls}
-            placeholder="Ex. Le client demande 5$ de plus par lot déjà fourni." />
+            placeholder={direction === 'CREDIT' ? 'Ex. Le client négocie 5$ de rabais par lot déjà fourni.' : 'Ex. Le client accepte 5$ de plus par lot déjà fourni.'} />
         </Field>
 
         <div className="flex justify-between border-t border-stone-200 pt-3">
           <span className="text-xs uppercase tracking-wider font-bold text-stone-600">Impact total</span>
-          <span className="text-xl font-bold tabular-nums text-chika-paprika">+{fmtCAD(totalImpact)}</span>
+          <span className={`text-xl font-bold tabular-nums ${direction === 'CREDIT' ? 'text-red-600' : 'text-chika-paprika'}`}>
+            {totalImpact >= 0 ? '+' : '−'}{fmtCAD(Math.abs(totalImpact))}
+          </span>
         </div>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">

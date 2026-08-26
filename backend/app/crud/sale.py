@@ -168,16 +168,20 @@ def _revisable_original_item(sale: Sale, item_id: int) -> SaleItem:
 
 def apply_lot_price_revision(
     db: Session, sale: Sale, lines: list[LotPriceRevisionLine], amount_per_lot: Decimal, reason: str, current: User,
+    direction: str = "CREDIT",
 ) -> Sale:
     """Ajoute une ligne LOT_ADJUSTMENT par ligne visée — la facture originale
     n'est pas touchée, mais total_amount (somme des lignes) reflète tout de
-    suite le vrai montant partout où il est lu (dashboard, PDF, etc.)."""
+    suite le vrai montant partout où il est lu (dashboard, PDF, etc.).
+    direction=CREDIT (défaut) soustrait — c'est le cas le plus fréquent :
+    un client négocie un rabais après avoir déjà reçu la marchandise."""
     if sale.status == "CANCELLED":
         raise HTTPException(status_code=400, detail="Impossible de réviser une vente annulée")
 
+    sign = Decimal(-1) if direction == "CREDIT" else Decimal(1)
     for line in lines:
         original = _revisable_original_item(sale, line.item_id)
-        subtotal = Decimal(line.lots) * amount_per_lot
+        subtotal = sign * Decimal(line.lots) * amount_per_lot
         # .append() (pas db.add) : garde sale.items à jour en mémoire tout de
         # suite, nécessaire pour recalculer total_amount juste après.
         sale.items.append(SaleItem(

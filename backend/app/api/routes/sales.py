@@ -100,7 +100,7 @@ def revise_lot_price(
     if not sale:
         raise HTTPException(status_code=404, detail="Vente introuvable")
     return _to_read(crud.apply_lot_price_revision(
-        db, sale, payload.lines, payload.amount_per_lot, payload.reason, current,
+        db, sale, payload.lines, payload.amount_per_lot, payload.reason, current, direction=payload.direction,
     ))
 
 

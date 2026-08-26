@@ -72,8 +72,11 @@ export async function updateSaleStatus(id: number, status: SaleStatus, payment_d
 }
 
 // ── Révisions de facture ──────────────────────────────────────────────
+export type LotRevisionDirection = 'CREDIT' | 'SURCHARGE'
+
 export interface LotPriceRevisionPayload {
   amount_per_lot: number
+  direction: LotRevisionDirection
   reason: string
   lines: { item_id: number; lots: number }[]
 }

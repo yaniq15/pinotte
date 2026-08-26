@@ -50,8 +50,14 @@ class LotPriceRevisionLine(BaseModel):
     lots: int = Field(..., gt=0, description="Nb de lots à facturer sur cette ligne (le front pré-calcule via boxes_per_lot, mais l'user peut ajuster)")
 
 
+LotRevisionDirection = Literal["CREDIT", "SURCHARGE"]
+
+
 class LotPriceRevisionRequest(BaseModel):
-    amount_per_lot: Decimal = Field(..., gt=0)
+    amount_per_lot: Decimal = Field(..., gt=0, description="Montant par lot, toujours positif — le signe vient de `direction`")
+    direction: LotRevisionDirection = Field(
+        "CREDIT", description="CREDIT = rabais négocié après-coup (soustrait) ; SURCHARGE = supplément facturé (ajouté)",
+    )
     reason: str = Field(..., min_length=1, max_length=500)
     lines: list[LotPriceRevisionLine] = Field(..., min_length=1)
 
