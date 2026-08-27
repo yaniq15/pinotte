@@ -13,18 +13,18 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
+import { useT } from '../lib/i18n'
 
-const schema = z.object({
-  name: z.string().min(1, 'Requis'),
-  type: z.enum(['BROKER', 'STORE']),
-  email: z.string().email('Invalide').optional().or(z.literal('')),
-  phone: z.string().optional().or(z.literal('')),
-  address: z.string().optional().or(z.literal('')),
-  payment_terms_days: z.coerce.number().int().min(0).max(365).default(30),
-  distribution_rate_pct: z.coerce.number().min(0).max(1).optional().or(z.literal('')),
-  active: z.boolean().default(true),
-})
-type FormData = z.infer<typeof schema>
+type FormData = {
+  name: string
+  type: 'BROKER' | 'STORE'
+  email?: string
+  phone?: string
+  address?: string
+  payment_terms_days: number
+  distribution_rate_pct?: number | ''
+  active: boolean
+}
 
 const fmtPct = (v: number | string | null | undefined) => {
   if (v === null || v === undefined || v === '') return '—'
@@ -34,6 +34,7 @@ const fmtPct = (v: number | string | null | undefined) => {
 
 export default function ClientsPage() {
   const qc = useQueryClient()
+  const t = useT()
   const [filterType, setFilterType] = useState<string>('')
   const [editing, setEditing] = useState<Client | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -46,11 +47,11 @@ export default function ClientsPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
-        title="Clients"
-        description="Courtiers (avec taux de distribution) et magasins direct."
+        title={t('clients.title')}
+        description={t('clients.description')}
         action={
           <Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>
-            Nouveau client
+            {t('clients.new')}
           </Button>
         }
       />
@@ -60,30 +61,30 @@ export default function ClientsPage() {
           <label className="text-xs font-medium text-stone-600">Type</label>
           <select value={filterType} onChange={e => setFilterType(e.target.value)}
             className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
-            <option value="">Tous</option>
-            <option value="BROKER">Courtiers</option>
-            <option value="STORE">Magasins</option>
+            <option value="">{t('clients.filter.all')}</option>
+            <option value="BROKER">{t('clients.filter.brokers')}</option>
+            <option value="STORE">{t('clients.filter.stores')}</option>
           </select>
         </div>
       </Card>
 
       <Card>
         {isLoading
-          ? <div className="p-8 text-center text-stone-400 text-sm">Chargement…</div>
+          ? <div className="p-8 text-center text-stone-400 text-sm">{t('label.loading')}</div>
           : clients.length === 0
-          ? <EmptyState icon="👥" title="Aucun client" description="Crée ton premier client (courtier ou magasin)."
-              action={<Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>Nouveau client</Button>} />
+          ? <EmptyState icon="👥" title={t('clients.empty.title')} description={t('clients.empty.desc')}
+              action={<Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>{t('clients.new')}</Button>} />
           : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="text-left px-5 py-3">Nom</th>
+                    <th className="text-left px-5 py-3">{t('label.name')}</th>
                     <th className="text-left px-5 py-3">Type</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Taux distrib.</th>
-                    <th className="text-left px-5 py-3 hidden sm:table-cell">Contact</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Délai paiement</th>
-                    <th className="text-center px-5 py-3">Actif</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">{t('clients.table.distrib_rate')}</th>
+                    <th className="text-left px-5 py-3 hidden sm:table-cell">{t('clients.table.contact')}</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">{t('clients.table.payment_delay')}</th>
+                    <th className="text-center px-5 py-3">{t('clients.table.active')}</th>
                     <th className="px-5 py-3 w-12"></th>
                   </tr>
                 </thead>
@@ -93,7 +94,7 @@ export default function ClientsPage() {
                       <td className="px-5 py-3 font-medium text-stone-900">{c.name}</td>
                       <td className="px-5 py-3">
                         <Badge tone={c.type === 'BROKER' ? 'info' : 'paprika'}>
-                          {c.type === 'BROKER' ? 'Courtier' : 'Magasin'}
+                          {c.type === 'BROKER' ? t('dashboard.client_type.broker') : t('dashboard.client_type.store')}
                         </Badge>
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700 font-semibold">
@@ -103,9 +104,9 @@ export default function ClientsPage() {
                         {c.email && <div>{c.email}</div>}
                         {c.phone && <div className="text-stone-400">{c.phone}</div>}
                       </td>
-                      <td className="px-5 py-3 text-right text-stone-600 tabular-nums hidden md:table-cell">{c.payment_terms_days} j</td>
+                      <td className="px-5 py-3 text-right text-stone-600 tabular-nums hidden md:table-cell">{c.payment_terms_days} {t('clients.days_suffix')}</td>
                       <td className="px-5 py-3 text-center">
-                        {c.active ? <Badge tone="success">Oui</Badge> : <Badge tone="neutral">Non</Badge>}
+                        {c.active ? <Badge tone="success">{t('clients.active.yes')}</Badge> : <Badge tone="neutral">{t('clients.active.no')}</Badge>}
                       </td>
                       <td className="px-5 py-3 text-right">
                         <button onClick={() => { setEditing(c); setShowForm(true) }}
@@ -131,8 +132,21 @@ function ClientForm({ initial, onClose, onSaved }: {
   initial: Client | null; onClose: () => void; onSaved: () => void
 }) {
   const qc = useQueryClient()
+  const t = useT()
   const isEdit = !!initial
   const [serverError, setServerError] = useState<string | null>(null)
+
+  const schema = z.object({
+    name: z.string().min(1, t('validation.required')),
+    type: z.enum(['BROKER', 'STORE']),
+    email: z.string().email(t('validation.invalid')).optional().or(z.literal('')),
+    phone: z.string().optional().or(z.literal('')),
+    address: z.string().optional().or(z.literal('')),
+    payment_terms_days: z.coerce.number().int().min(0).max(365).default(30),
+    distribution_rate_pct: z.coerce.number().min(0).max(1).optional().or(z.literal('')),
+    active: z.boolean().default(true),
+  })
+
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
     defaultValues: initial
@@ -164,20 +178,20 @@ function ClientForm({ initial, onClose, onSaved }: {
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
   const onDelete = async () => {
     if (!initial) return
-    if (!window.confirm(`Supprimer "${initial.name}" ?`)) return
+    if (!window.confirm(t('clients.confirm_delete').replace('{name}', initial.name))) return
     try {
       await deleteClient(initial.id)
       qc.invalidateQueries({ queryKey: ['clients'] })
       onSaved()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Suppression impossible')
+      setServerError(msg || t('clients.delete_error'))
     }
   }
 
@@ -187,49 +201,49 @@ function ClientForm({ initial, onClose, onSaved }: {
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier le client' : 'Nouveau client'}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? t('clients.form.edit_title') : t('clients.new')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
-        <Field label="Nom" error={errors.name?.message}>
+        <Field label={t('label.name')} error={errors.name?.message}>
           <input {...register('name')} className={inputCls} />
         </Field>
         <Field label="Type" error={errors.type?.message}>
           <select {...register('type')} className={inputCls}>
-            <option value="BROKER">Courtier (distributeur)</option>
-            <option value="STORE">Magasin (direct)</option>
+            <option value="BROKER">{t('clients.form.type_broker')}</option>
+            <option value="STORE">{t('clients.form.type_store')}</option>
           </select>
         </Field>
 
         {currentType === 'BROKER' && (
-          <Field label="Taux de distribution (ex: 0.18 pour 18%)" error={errors.distribution_rate_pct?.message}>
+          <Field label={t('clients.form.distribution_rate_label')} error={errors.distribution_rate_pct?.message}>
             <input type="number" step="0.01" min="0" max="1" {...register('distribution_rate_pct')}
               className={inputCls} placeholder="0.18" />
             <p className="mt-1 text-[11px] text-stone-500">
-              Ce taux est retiré du prix magasin pour calculer ce que tu reçois. Ex: prix magasin 6,49 $ − 18 % = 5,32 $.
+              {t('clients.form.distribution_rate_hint')}
             </p>
           </Field>
         )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Email"><input type="email" {...register('email')} className={inputCls} /></Field>
-          <Field label="Téléphone"><input {...register('phone')} className={inputCls} /></Field>
+          <Field label={t('clients.form.phone')}><input {...register('phone')} className={inputCls} /></Field>
         </div>
-        <Field label="Adresse"><textarea {...register('address')} rows={2} className={inputCls} /></Field>
-        <Field label="Délai de paiement (jours)" error={errors.payment_terms_days?.message}>
+        <Field label={t('clients.form.address')}><textarea {...register('address')} rows={2} className={inputCls} /></Field>
+        <Field label={t('clients.form.payment_days')} error={errors.payment_terms_days?.message}>
           <input type="number" {...register('payment_terms_days')} className={inputCls} />
         </Field>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" {...register('active')} className="accent-chika-paprika" /> Client actif
+          <input type="checkbox" {...register('active')} className="accent-chika-paprika" /> {t('clients.form.active_checkbox')}
         </label>
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200">
-          {isEdit && <Button type="button" variant="danger" size="sm" onClick={onDelete}>Supprimer</Button>}
+          {isEdit && <Button type="button" variant="danger" size="sm" onClick={onDelete}>{t('action.delete')}</Button>}
           <div className="flex gap-2 ml-auto">
-            <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '…' : isEdit ? 'Enregistrer' : 'Créer'}
+              {isSubmitting ? '…' : isEdit ? t('action.save') : t('action.create')}
             </Button>
           </div>
         </div>
