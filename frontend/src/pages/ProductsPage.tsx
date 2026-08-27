@@ -15,6 +15,7 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Barcode } from '../components/ui/Barcode'
+import { useT } from '../lib/i18n'
 
 // Preprocess: convert empty strings (from <input>) to undefined so .optional() works cleanly.
 const optNum = (max?: number) => {
@@ -23,24 +24,22 @@ const optNum = (max?: number) => {
   return z.preprocess((v) => (v === '' || v === null ? undefined : v), n.optional())
 }
 
-const schema = z.object({
-  name: z.string().min(1, 'Requis'),
-  sku: z.string().min(1, 'Requis'),
-  units_per_box: z.coerce.number().int().positive('> 0 requis'),
-  boxes_per_lot: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().positive('> 0 requis').optional()),
-  unit_cost: optNum(),
-  consumer_price: optNum(),
-  store_margin_pct: optNum(1),
-  price_broker: optNum(),
-  price_direct: optNum(),
-  currency: z.string().length(3).default('CAD'),
-  active: z.boolean().default(true),
-  image_url: z.string().optional(),
-  taxable: z.boolean().default(false),
-  gtin: z.string().optional().or(z.literal('')),
-})
-
-type FormData = z.infer<typeof schema>
+type FormData = {
+  name: string
+  sku: string
+  units_per_box: number
+  boxes_per_lot?: number
+  unit_cost?: number
+  consumer_price?: number
+  store_margin_pct?: number
+  price_broker?: number
+  price_direct?: number
+  currency: string
+  active: boolean
+  image_url?: string
+  taxable: boolean
+  gtin?: string
+}
 
 const num = (v: number | string | null | undefined): number | null => {
   if (v === null || v === undefined || v === '') return null
@@ -58,6 +57,7 @@ const fmtPct = (v: number | string | null | undefined) => {
 
 export default function ProductsPage() {
   const qc = useQueryClient()
+  const t = useT()
   const { data: products = [], isLoading } = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [editing, setEditing] = useState<Product | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -66,34 +66,34 @@ export default function ProductsPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
-        title="Produits"
-        description="Catalogue — structure de prix complète (PDS → marge magasin → distribution)."
+        title={t('products.title')}
+        description={t('products.description')}
         action={
           <Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>
-            Nouveau produit
+            {t('products.new')}
           </Button>
         }
       />
 
       <Card>
         {isLoading
-          ? <div className="p-8 text-center text-stone-400 text-sm">Chargement…</div>
+          ? <div className="p-8 text-center text-stone-400 text-sm">{t('label.loading')}</div>
           : products.length === 0
-          ? <EmptyState icon="📦" title="Aucun produit" description="Crée ton premier produit pour commencer."
-              action={<Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>Nouveau produit</Button>} />
+          ? <EmptyState icon="📦" title={t('products.empty.title')} description={t('products.empty.desc')}
+              action={<Button icon={<Plus size={16} />} onClick={() => { setEditing(null); setShowForm(true) }}>{t('products.new')}</Button>} />
           : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                   <tr>
                     <th className="text-left px-5 py-3 w-12"></th>
-                    <th className="text-left px-5 py-3">Produit</th>
-                    <th className="text-left px-5 py-3 hidden sm:table-cell">SKU</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">U/cs</th>
-                    <th className="text-right px-5 py-3">PDS</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Prix magasin</th>
-                    <th className="text-right px-5 py-3 hidden md:table-cell">Net distrib.</th>
-                    <th className="text-center px-5 py-3">Statut</th>
+                    <th className="text-left px-5 py-3">{t('products.table.product')}</th>
+                    <th className="text-left px-5 py-3 hidden sm:table-cell">{t('products.form.sku')}</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">{t('products.table.upc')}</th>
+                    <th className="text-right px-5 py-3">{t('products.table.pds')}</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">{t('products.table.store_price')}</th>
+                    <th className="text-right px-5 py-3 hidden md:table-cell">{t('products.table.net_distrib')}</th>
+                    <th className="text-center px-5 py-3">{t('label.status')}</th>
                     <th className="px-5 py-3 w-12"></th>
                   </tr>
                 </thead>
@@ -126,18 +126,18 @@ export default function ProductsPage() {
                           <td className="px-5 py-3 text-right tabular-nums font-semibold text-chika-paprika">{fmtCAD(p.consumer_price)}</td>
                           <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-700">
                             <div>{fmtCAD(p.price_direct)}<span className="text-stone-400 text-[10px] ml-0.5">/u</span></div>
-                            <div className="text-[10px] text-stone-500">{fmtCAD(num(p.price_direct) !== null ? Number(p.price_direct) * upb : null)}/caisse</div>
+                            <div className="text-[10px] text-stone-500">{fmtCAD(num(p.price_direct) !== null ? Number(p.price_direct) * upb : null)}{t('products.table.per_case_suffix')}</div>
                           </td>
                           <td className="px-5 py-3 text-right tabular-nums hidden md:table-cell text-stone-900">
                             <div className="font-semibold">{fmtCAD(p.price_broker)}<span className="text-stone-400 text-[10px] ml-0.5 font-normal">/u</span></div>
-                            <div className="text-[10px] text-stone-500 font-normal">{fmtCAD(caisseValue)}/caisse</div>
+                            <div className="text-[10px] text-stone-500 font-normal">{fmtCAD(caisseValue)}{t('products.table.per_case_suffix')}</div>
                           </td>
                           <td className="px-5 py-3 text-center">
-                            {p.active ? <Badge tone="success">Actif</Badge> : <Badge tone="neutral">Inactif</Badge>}
+                            {p.active ? <Badge tone="success">{t('products.status.active')}</Badge> : <Badge tone="neutral">{t('products.status.inactive')}</Badge>}
                           </td>
                           <td className="px-5 py-3 text-right">
                             <button onClick={() => { setEditing(p); setShowForm(true) }}
-                              className="text-stone-400 hover:text-chika-paprika p-1" title="Modifier">
+                              className="text-stone-400 hover:text-chika-paprika p-1" title={t('action.edit')}>
                               <Pencil size={14} />
                             </button>
                           </td>
@@ -174,6 +174,7 @@ export default function ProductsPage() {
 }
 
 function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; costNetCaisse: number | null }) {
+  const t = useT()
   // Calcule la vraie commission courtier appliquée à partir des prix stockés
   const brokerPctReal = (p.price_direct && p.price_broker && Number(p.price_direct) > 0)
     ? Math.round((1 - Number(p.price_broker) / Number(p.price_direct)) * 100)
@@ -181,25 +182,25 @@ function PricingBreakdown({ product: p, costNetCaisse }: { product: Product; cos
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
       <Step
-        label="Prix de vente consommateur (PDS)"
+        label={t('products.breakdown.consumer_label')}
         value={fmtCAD(p.consumer_price)}
-        sub="Affiché en magasin"
+        sub={t('products.breakdown.consumer_sub')}
       />
       <Step
-        label={`Moins marge magasin ${fmtPct(p.store_margin_pct)}`}
+        label={`${t('products.breakdown.minus_margin_prefix')} ${fmtPct(p.store_margin_pct)}`}
         value={fmtCAD(p.price_direct)}
-        sub="= Prix coûtant magasin (ce que paie un STORE)"
+        sub={t('products.breakdown.store_sub')}
       />
       <Step
-        label={`Moins distribution${brokerPctReal !== null ? ` ${brokerPctReal}%` : ''}`}
+        label={`${t('products.breakdown.minus_distrib_prefix')}${brokerPctReal !== null ? ` ${brokerPctReal}%` : ''}`}
         value={fmtCAD(p.price_broker)}
-        sub="= Cost net distributeur (ce que tu reçois via BROKER)"
+        sub={t('products.breakdown.broker_sub')}
         highlight
       />
       <Step
-        label={`Par caisse (× ${p.units_per_box} unités)`}
+        label={`${t('products.breakdown.per_case_prefix')} ${p.units_per_box} ${t('products.breakdown.per_case_suffix')}`}
         value={fmtCAD(costNetCaisse)}
-        sub="Prix d'une caisse en circuit courtier"
+        sub={t('products.breakdown.per_case_sub')}
       />
     </div>
   )
@@ -219,8 +220,26 @@ function ProductForm({ initial, onClose, onSaved }: {
   initial: Product | null; onClose: () => void; onSaved: () => void
 }) {
   const qc = useQueryClient()
+  const t = useT()
   const isEdit = !!initial
   const [serverError, setServerError] = useState<string | null>(null)
+
+  const schema = z.object({
+    name: z.string().min(1, t('validation.required')),
+    sku: z.string().min(1, t('validation.required')),
+    units_per_box: z.coerce.number().int().positive(t('validation.positive_required')),
+    boxes_per_lot: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().positive(t('validation.positive_required')).optional()),
+    unit_cost: optNum(),
+    consumer_price: optNum(),
+    store_margin_pct: optNum(1),
+    price_broker: optNum(),
+    price_direct: optNum(),
+    currency: z.string().length(3).default('CAD'),
+    active: z.boolean().default(true),
+    image_url: z.string().optional(),
+    taxable: z.boolean().default(false),
+    gtin: z.string().optional().or(z.literal('')),
+  })
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     // z.coerce.number infers input as `unknown`; cast keeps RHF happy.
@@ -259,11 +278,11 @@ function ProductForm({ initial, onClose, onSaved }: {
     const f = e.target.files?.[0]
     if (!f) return
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type)) {
-      setServerError('Code-barres : type non supporté (jpeg/png/webp/gif)')
+      setServerError(t('error.barcode_unsupported_type'))
       return
     }
     if (f.size > 5 * 1024 * 1024) {
-      setServerError('Code-barres : image trop volumineuse (max 5 MB)')
+      setServerError(t('error.barcode_too_large'))
       return
     }
     setPendingBarcodeFile(f)
@@ -275,11 +294,11 @@ function ProductForm({ initial, onClose, onSaved }: {
     const f = e.target.files?.[0]
     if (!f) return
     if (!['image/jpeg','image/png','image/webp','image/gif'].includes(f.type)) {
-      setServerError('Type de fichier non supporté (jpeg/png/webp/gif uniquement)')
+      setServerError(t('error.image_unsupported_type'))
       return
     }
     if (f.size > 5 * 1024 * 1024) {
-      setServerError('Image trop volumineuse (max 5 MB)')
+      setServerError(t('error.image_too_large'))
       return
     }
     setPendingFile(f)
@@ -328,20 +347,20 @@ function ProductForm({ initial, onClose, onSaved }: {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); onSaved() },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
   const onDelete = async () => {
     if (!initial) return
-    if (!window.confirm(`Supprimer "${initial.name}" ?`)) return
+    if (!window.confirm(t('clients.confirm_delete').replace('{name}', initial.name))) return
     try {
       await deleteProduct(initial.id)
       qc.invalidateQueries({ queryKey: ['products'] })
       onSaved()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Suppression impossible')
+      setServerError(msg || t('clients.delete_error'))
     }
   }
 
@@ -351,7 +370,7 @@ function ProductForm({ initial, onClose, onSaved }: {
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier le produit' : 'Nouveau produit'}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? t('products.form.edit_title') : t('products.form.new_title')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
 
@@ -360,22 +379,22 @@ function ProductForm({ initial, onClose, onSaved }: {
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Nom" error={errors.name?.message}>
+          <Field label={t('label.name')} error={errors.name?.message}>
             <input {...register('name')} className={inputCls} />
           </Field>
-          <Field label="SKU" error={errors.sku?.message}>
+          <Field label={t('products.form.sku')} error={errors.sku?.message}>
             <input {...register('sku')} className={`${inputCls} font-mono uppercase`} />
           </Field>
         </div>
         <div className="grid grid-cols-4 gap-3">
-          <Field label="Unités par caisse" error={errors.units_per_box?.message}>
+          <Field label={t('products.form.units_per_box')} error={errors.units_per_box?.message}>
             <input type="number" min="1" {...register('units_per_box')} className={inputCls} />
           </Field>
-          <Field label="Caisses par lot" error={errors.boxes_per_lot?.message}>
+          <Field label={t('products.form.boxes_per_lot')} error={errors.boxes_per_lot?.message}>
             <input type="number" min="1" placeholder="—" {...register('boxes_per_lot')} className={inputCls} />
-            <p className="mt-1 text-[10px] text-stone-500">Optionnel — active la révision de prix par lot sur les ventes.</p>
+            <p className="mt-1 text-[10px] text-stone-500">{t('products.form.boxes_per_lot_hint')}</p>
           </Field>
-          <Field label="Coût unitaire (production)">
+          <Field label={t('products.form.unit_cost')}>
             {isEdit ? (
               <>
                 {/* Lecture seule en édition : le coût est piloté par le Calculateur.
@@ -385,22 +404,22 @@ function ProductForm({ initial, onClose, onSaved }: {
                 <div className={`${inputCls} bg-stone-100 text-stone-500 cursor-not-allowed flex items-center`}>
                   {watch('unit_cost') != null && watch('unit_cost') !== ('' as unknown as number)
                     ? `${Number(watch('unit_cost')).toFixed(2)} $`
-                    : '— non défini —'}
+                    : t('products.form.unit_cost_not_set')}
                 </div>
                 <p className="mt-1 text-[11px] text-stone-500">
-                  🔒 Calculé via le <strong>Calculateur</strong> (recette → « Appliquer au produit »). Non modifiable ici.
+                  {t('products.form.unit_cost_locked_hint_prefix')} <strong>{t('nav.calculator')}</strong> {t('products.form.unit_cost_locked_hint_suffix')}
                 </p>
               </>
             ) : (
               <>
                 <input type="number" step="0.01" {...register('unit_cost')} className={inputCls} placeholder="0.00" />
                 <p className="mt-1 text-[11px] text-stone-500">
-                  Coût initial optionnel. Sera ensuite piloté par le Calculateur.
+                  {t('products.form.unit_cost_new_hint')}
                 </p>
               </>
             )}
           </Field>
-          <Field label="Devise">
+          <Field label={t('products.form.currency')}>
             <select {...register('currency')} className={inputCls}>
               <option value="CAD">CAD</option>
               <option value="USD">USD</option>
@@ -409,15 +428,15 @@ function ProductForm({ initial, onClose, onSaved }: {
         </div>
 
         <div className="bg-chika-creamSoft/50 ring-1 ring-chika-cream rounded-lg p-4 space-y-3">
-          <div className="text-xs font-semibold text-chika-brown uppercase tracking-wider">Structure de prix</div>
+          <div className="text-xs font-semibold text-chika-brown uppercase tracking-wider">{t('products.form.pricing_structure')}</div>
           <div className="grid grid-cols-3 gap-3">
-            <Field label="PDS — Prix consommateur" error={errors.consumer_price?.message}>
+            <Field label={t('products.form.pds_label')} error={errors.consumer_price?.message}>
               <input type="number" step="0.01" {...register('consumer_price')} className={inputCls} placeholder="9.99" />
             </Field>
-            <Field label="Marge magasin (fraction)" error={errors.store_margin_pct?.message}>
+            <Field label={t('products.form.store_margin_label')} error={errors.store_margin_pct?.message}>
               <input type="number" step="0.01" min="0" max="1" {...register('store_margin_pct')} className={inputCls} placeholder="0.35" />
             </Field>
-            <Field label="Commission courtier (fraction)">
+            <Field label={t('products.form.broker_commission_label')}>
               <input type="number" step="0.01" min="0" max="1"
                 value={brokerCommission}
                 onChange={e => setBrokerCommission(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
@@ -426,52 +445,52 @@ function ProductForm({ initial, onClose, onSaved }: {
           </div>
           <div className="text-xs text-chika-brown flex items-center justify-between gap-2">
             <span>
-              Auto-calculé : prix magasin <strong className="tabular-nums text-stone-900">{direct !== null ? fmtCAD(direct) : '—'}</strong>
-              {' · '}cost net ({brokerPct}%) <strong className="tabular-nums text-chika-paprika">{broker !== null ? fmtCAD(broker) : '—'}</strong>
+              {t('products.form.auto_calc_prefix')} <strong className="tabular-nums text-stone-900">{direct !== null ? fmtCAD(direct) : '—'}</strong>
+              {' · '}{t('products.form.auto_calc_mid')} ({brokerPct}%) <strong className="tabular-nums text-chika-paprika">{broker !== null ? fmtCAD(broker) : '—'}</strong>
             </span>
             <Button type="button" variant="secondary" size="sm" onClick={applyDerived}>
-              Appliquer
+              {t('products.form.apply_button')}
             </Button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Prix direct magasin (CAD)">
+            <Field label={t('products.form.direct_price_label')}>
               <input type="number" step="0.01" {...register('price_direct')} className={inputCls} placeholder="6.49" />
             </Field>
-            <Field label="Prix courtier net (CAD)">
+            <Field label={t('products.form.broker_price_label')}>
               <input type="number" step="0.01" {...register('price_broker')} className={inputCls} placeholder="5.32" />
             </Field>
           </div>
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-stone-600 uppercase tracking-wider">Image du produit</div>
+          <div className="text-xs font-semibold text-stone-600 uppercase tracking-wider">{t('products.form.image_section')}</div>
           <div className="flex gap-1.5">
             <button type="button" onClick={() => setImageMode('url')}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${imageMode === 'url' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
-              🔗 URL externe
+              {t('products.form.image_url_mode')}
             </button>
             <button type="button" onClick={() => setImageMode('upload')}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${imageMode === 'upload' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
-              📁 Upload depuis PC
+              {t('products.form.image_upload_mode')}
             </button>
           </div>
 
           {imageMode === 'url' ? (
-            <Field label="URL de l'image">
+            <Field label={t('products.form.image_url_label')}>
               <input {...register('image_url')} className={inputCls}
                 placeholder="https://... ou /brand/..."
                 onChange={(e) => setPreviewUrl(e.target.value || null)} />
             </Field>
           ) : (
             <div className="space-y-2">
-              <Field label="Choisir un fichier (jpeg/png/webp/gif, max 5 MB)">
+              <Field label={t('products.form.image_file_label')}>
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={onFileSelected}
                   className={`${inputCls} file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 file:text-xs file:font-semibold`} />
               </Field>
               {pendingFile && (
                 <div className="text-[11px] text-stone-500">
-                  📎 {pendingFile.name} · {(pendingFile.size / 1024).toFixed(0)} KB · sera uploadé à la sauvegarde
+                  📎 {pendingFile.name} · {(pendingFile.size / 1024).toFixed(0)} KB · {t('products.form.file_pending_suffix')}
                 </div>
               )}
             </div>
@@ -483,7 +502,7 @@ function ProductForm({ initial, onClose, onSaved }: {
                 alt="Aperçu" className="w-16 h-16 object-cover rounded"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
               <div className="text-[11px] text-stone-500 truncate flex-1">
-                {previewUrl.startsWith('blob:') ? 'Aperçu local (avant upload)' : previewUrl}
+                {previewUrl.startsWith('blob:') ? t('products.form.preview_local') : previewUrl}
               </div>
             </div>
           )}
@@ -492,14 +511,14 @@ function ProductForm({ initial, onClose, onSaved }: {
         {/* ── Code-barres GS1 ──────────────────────────────────── */}
         <div className="space-y-2 border-t border-stone-200 pt-3">
           <label className="block text-xs font-bold uppercase tracking-wider text-stone-600">
-            Code-barres GS1
+            {t('products.form.barcode_section')}
           </label>
-          <Field label="Numéro GTIN (8, 12 ou 13 chiffres)">
+          <Field label={t('products.form.gtin_label')}>
             <input {...register('gtin')} className={`${inputCls} font-mono`}
               placeholder="Ex: 0627843210019" inputMode="numeric" />
           </Field>
           <p className="text-[11px] text-stone-500">
-            Pinotte génère automatiquement le code-barres EAN-13 à partir du numéro.
+            {t('products.form.gtin_hint')}
           </p>
           {/* Aperçu code-barres généré */}
           {(() => {
@@ -514,14 +533,14 @@ function ProductForm({ initial, onClose, onSaved }: {
           {/* Upload image de code-barres (alternative) */}
           <div className="pt-1">
             <label className="block text-[11px] font-semibold text-stone-500 mb-1">
-              OU upload ta propre image de code-barres (jpeg/png/webp, max 5 MB)
+              {t('products.form.barcode_upload_label')}
             </label>
             <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={onBarcodeFileSelected}
               className={`${inputCls} file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 file:text-xs file:font-semibold`} />
             {pendingBarcodeFile && (
               <div className="text-[11px] text-stone-500 mt-1">
-                📎 {pendingBarcodeFile.name} · sera uploadé à la sauvegarde
+                📎 {pendingBarcodeFile.name} · {t('products.form.file_pending_suffix')}
               </div>
             )}
             {barcodePreview && (
@@ -537,14 +556,14 @@ function ProductForm({ initial, onClose, onSaved }: {
         <div className="space-y-2 border-t border-stone-200 pt-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" {...register('active')} className="accent-chika-paprika" />
-            <span>Produit actif</span>
+            <span>{t('products.form.active_checkbox')}</span>
           </label>
           <label className="flex items-start gap-2 text-sm cursor-pointer">
             <input type="checkbox" {...register('taxable')} className="accent-chika-paprika mt-0.5" />
             <span>
-              Soumis aux taxes (TPS + TVQ)
+              {t('products.form.taxable_checkbox')}
               <span className="block text-[10px] text-stone-500 mt-0.5">
-                ⚠️ Au Québec, l'épicerie de base est <strong>détaxée</strong> (légumes, viande, sauces alimentaires). Coche seulement si ce produit est taxable (ex: cadeaux, marketing, produits non alimentaires).
+                ⚠️ {t('products.form.taxable_hint_prefix')} <strong>{t('products.form.taxable_hint_bold')}</strong> {t('products.form.taxable_hint_suffix')}
               </span>
             </span>
           </label>
@@ -552,12 +571,12 @@ function ProductForm({ initial, onClose, onSaved }: {
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200">
           {isEdit && (
-            <Button type="button" variant="danger" size="sm" onClick={onDelete}>Supprimer</Button>
+            <Button type="button" variant="danger" size="sm" onClick={onDelete}>{t('action.delete')}</Button>
           )}
           <div className="flex gap-2 ml-auto">
-            <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '…' : isEdit ? 'Enregistrer' : 'Créer'}
+              {isSubmitting ? '…' : isEdit ? t('action.save') : t('action.create')}
             </Button>
           </div>
         </div>
