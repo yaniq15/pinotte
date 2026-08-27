@@ -8,30 +8,35 @@ import { Plus, X, Factory, ShoppingCart, AlertTriangle, Settings2, RotateCcw } f
 import { listMovements, createMovement, type Movement, type MovementType, type MovementPayload } from '../api/movements'
 import { listProducts } from '../api/products'
 import { PageHeader } from '../components/shared/AppLayout'
+import { useT, useLang } from '../lib/i18n'
 
-const schema = z.object({
-  product_id: z.coerce.number().int().positive('Requis'),
-  movement_type: z.enum(['LOSS', 'ADJUSTMENT']),
-  quantity_boxes: z.coerce.number().int().refine(n => n !== 0, '≠ 0'),
-  movement_date: z.string().min(1, 'Requise'),
-  notes: z.string().min(1, 'Note explicative requise'),
-})
-
-type FormData = z.infer<typeof schema>
-
-const TYPE_META: Record<MovementType, { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; cls: string }> = {
-  PRODUCTION: { label: 'Production',  icon: Factory,        cls: 'bg-emerald-100 text-emerald-700' },
-  SALE:       { label: 'Vente',       icon: ShoppingCart,   cls: 'bg-blue-100 text-blue-700' },
-  LOSS:       { label: 'Perte',       icon: AlertTriangle,  cls: 'bg-red-100 text-red-700' },
-  ADJUSTMENT: { label: 'Ajustement',  icon: Settings2,      cls: 'bg-stone-200 text-stone-700' },
-  RETURN:     { label: 'Retour',      icon: RotateCcw,      cls: 'bg-purple-100 text-purple-700' },
+type FormData = {
+  product_id: number
+  movement_type: 'LOSS' | 'ADJUSTMENT'
+  quantity_boxes: number
+  movement_date: string
+  notes: string
 }
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
+function useTypeMeta(): Record<MovementType, { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; cls: string }> {
+  const t = useT()
+  return {
+    PRODUCTION: { label: t('movements.type.production'), icon: Factory,       cls: 'bg-emerald-100 text-emerald-700' },
+    SALE:       { label: t('movements.type.sale'),        icon: ShoppingCart, cls: 'bg-blue-100 text-blue-700' },
+    LOSS:       { label: t('movements.type.loss'),        icon: AlertTriangle, cls: 'bg-red-100 text-red-700' },
+    ADJUSTMENT: { label: t('movements.type.adjustment'),  icon: Settings2,    cls: 'bg-stone-200 text-stone-700' },
+    RETURN:     { label: t('movements.type.return'),      icon: RotateCcw,    cls: 'bg-purple-100 text-purple-700' },
+  }
+}
+
+const fmtDate = (iso: string, lang: 'fr' | 'en') =>
+  new Date(iso).toLocaleDateString(lang === 'en' ? 'en-CA' : 'fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
 
 export default function MovementsPage() {
   const qc = useQueryClient()
+  const t = useT()
+  const [lang] = useLang()
+  const TYPE_META = useTypeMeta()
   const [filterProduct, setFilterProduct] = useState('')
   const [filterType, setFilterType] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -48,12 +53,12 @@ export default function MovementsPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl">
       <PageHeader
-        title="Mouvements de stock"
-        description="Historique de tous les flux de stock. Pertes et ajustements à saisir manuellement."
+        title={t('movements.title')}
+        description={t('movements.description')}
         action={
           <button onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
-            <Plus size={16} /> Saisir un mouvement
+            <Plus size={16} /> {t('movements.new')}
           </button>
         }
       />
@@ -61,18 +66,18 @@ export default function MovementsPage() {
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-stone-200 p-4 mb-4 flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Produit :</label>
+          <label className="text-sm font-semibold text-stone-700">{t('movements.filter.product')}</label>
           <select value={filterProduct} onChange={e => setFilterProduct(e.target.value)}
             className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Tous</option>
+            <option value="">{t('clients.filter.all')}</option>
             {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Type :</label>
+          <label className="text-sm font-semibold text-stone-700">{t('movements.filter.type')}</label>
           <select value={filterType} onChange={e => setFilterType(e.target.value)}
             className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Tous</option>
+            <option value="">{t('clients.filter.all')}</option>
             {Object.entries(TYPE_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
           </select>
         </div>
@@ -82,11 +87,11 @@ export default function MovementsPage() {
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
             <tr>
-              <th className="text-left px-4 py-3">Date</th>
+              <th className="text-left px-4 py-3">{t('label.date')}</th>
               <th className="text-left px-4 py-3">Type</th>
-              <th className="text-left px-4 py-3">Produit</th>
-              <th className="text-right px-4 py-3">Quantité</th>
-              <th className="text-left px-4 py-3 hidden md:table-cell">Note</th>
+              <th className="text-left px-4 py-3">{t('movements.form.product')}</th>
+              <th className="text-right px-4 py-3">{t('movements.table.quantity')}</th>
+              <th className="text-left px-4 py-3 hidden md:table-cell">{t('movements.table.note')}</th>
             </tr>
           </thead>
           <tbody>
@@ -95,7 +100,7 @@ export default function MovementsPage() {
               const Icon = meta.icon
               return (
                 <tr key={m.id} className="border-t border-stone-200 hover:bg-stone-50">
-                  <td className="px-4 py-3 text-stone-700">{fmtDate(m.movement_date)}</td>
+                  <td className="px-4 py-3 text-stone-700">{fmtDate(m.movement_date, lang)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${meta.cls}`}>
                       <Icon size={10} /> {meta.label}
@@ -110,7 +115,7 @@ export default function MovementsPage() {
               )
             })}
             {movements.data && movements.data.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-stone-400">Aucun mouvement.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-stone-400">{t('movements.empty')}</td></tr>
             )}
           </tbody>
         </table>
@@ -128,9 +133,18 @@ export default function MovementsPage() {
 }
 
 function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const t = useT()
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [serverError, setServerError] = useState<string | null>(null)
   const today = todayISO()
+
+  const schema = z.object({
+    product_id: z.coerce.number().int().positive(t('validation.required')),
+    movement_type: z.enum(['LOSS', 'ADJUSTMENT']),
+    quantity_boxes: z.coerce.number().int().refine(n => n !== 0, t('validation.non_zero')),
+    movement_date: z.string().min(1, t('validation.required_short')),
+    notes: z.string().min(1, t('validation.explanatory_note_required')),
+  })
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
@@ -153,7 +167,7 @@ function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -163,7 +177,7 @@ function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Nouveau mouvement</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('movements.form.new_title')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && (
@@ -172,33 +186,33 @@ function MovementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
         <Field label="Type" error={errors.movement_type?.message}>
           <select {...register('movement_type')} className={inputCls}>
-            <option value="LOSS">Perte (quantité négative obligatoire)</option>
-            <option value="ADJUSTMENT">Ajustement (+ ou −)</option>
+            <option value="LOSS">{t('movements.form.type_loss_option')}</option>
+            <option value="ADJUSTMENT">{t('movements.form.type_adjustment_option')}</option>
           </select>
         </Field>
-        <Field label="Produit" error={errors.product_id?.message}>
+        <Field label={t('movements.form.product')} error={errors.product_id?.message}>
           <select {...register('product_id')} className={inputCls}>
-            <option value="">Choisir un produit…</option>
+            <option value="">{t('movements.form.choose_product')}</option>
             {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field label={`Quantité en boîtes ${movementType === 'LOSS' ? '(doit être négative, ex: -5)' : '(positive ou négative)'}`} error={errors.quantity_boxes?.message}>
+        <Field label={`${t('movements.form.qty_label_prefix')} ${movementType === 'LOSS' ? t('movements.form.qty_hint_loss') : t('movements.form.qty_hint_adjustment')}`} error={errors.quantity_boxes?.message}>
           <input type="number" {...register('quantity_boxes')} className={`${inputCls} tabular-nums`} />
         </Field>
-        <Field label="Date" error={errors.movement_date?.message}>
+        <Field label={t('label.date')} error={errors.movement_date?.message}>
           <input type="date" {...register('movement_date')} className={inputCls} />
         </Field>
-        <Field label="Note (obligatoire)" error={errors.notes?.message}>
+        <Field label={t('movements.form.note_required')} error={errors.notes?.message}>
           <textarea {...register('notes')} rows={2} className={inputCls}
-            placeholder={movementType === 'LOSS' ? 'Ex: cartons endommagés à la livraison' : 'Ex: comptage trimestriel'} />
+            placeholder={movementType === 'LOSS' ? t('movements.form.note_placeholder_loss') : t('movements.form.note_placeholder_adjustment')} />
         </Field>
 
         <div className="flex gap-2 justify-end pt-2">
           <button type="button" onClick={onClose}
-            className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">Annuler</button>
+            className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">{t('action.cancel')}</button>
           <button type="submit" disabled={isSubmitting}
             className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-            {isSubmitting ? '…' : 'Enregistrer'}
+            {isSubmitting ? '…' : t('action.save')}
           </button>
         </div>
       </form>
