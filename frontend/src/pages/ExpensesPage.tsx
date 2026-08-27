@@ -12,36 +12,38 @@ import {
 } from '../api/expenses'
 import { listProducts } from '../api/products'
 import { PageHeader } from '../components/shared/AppLayout'
+import { useT, useLang } from '../lib/i18n'
 
-const schema = z.object({
-  category_id: z.coerce.number().int().positive('Requise'),
-  product_id: z.string().optional(),
-  amount: z.coerce.number().min(0, '≥ 0'),
-  expense_date: z.string().min(1, 'Requise'),
-  vendor: z.string().optional().or(z.literal('')),
-  description: z.string().min(1, 'Requise'),
-  receipt_url: z.string().optional().or(z.literal('')),
-  tps_paid: z.string().optional().or(z.literal('')),
-  tvq_paid: z.string().optional().or(z.literal('')),
-  vendor_tps_number: z.string().optional().or(z.literal('')),
-  vendor_tvq_number: z.string().optional().or(z.literal('')),
-  expense_type: z.enum(['COGS', 'OPEX', 'CAPEX', '']).optional(),
-  is_recurring: z.boolean().optional(),
-  recurrence_frequency: z.enum(['monthly', 'quarterly', 'yearly', '']).optional(),
-  cca_class: z.string().optional().or(z.literal('')),
-  deductibility_pct: z.coerce.number().int().min(0).max(100).optional(),
-})
-type FormData = z.infer<typeof schema>
+type FormData = {
+  category_id: number
+  product_id?: string
+  amount: number
+  expense_date: string
+  vendor?: string
+  description: string
+  receipt_url?: string
+  tps_paid?: string
+  tvq_paid?: string
+  vendor_tps_number?: string
+  vendor_tvq_number?: string
+  expense_type?: 'COGS' | 'OPEX' | 'CAPEX' | ''
+  is_recurring?: boolean
+  recurrence_frequency?: 'monthly' | 'quarterly' | 'yearly' | ''
+  cca_class?: string
+  deductibility_pct?: number
+}
 
 const fmtCAD = (v: number | string) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' })
     .format(typeof v === 'string' ? parseFloat(v) : v)
 
 // Affichage sans décalage de fuseau (parse "YYYY-MM-DD" en local)
-const fmtDate = (iso: string) => fmtDateLocal(iso)
+const fmtDate = (iso: string, lang: 'fr' | 'en') => fmtDateLocal(iso, lang === 'en' ? 'en-CA' : 'fr-CA')
 
 export default function ExpensesPage() {
   const qc = useQueryClient()
+  const t = useT()
+  const [lang] = useLang()
   const [filterCat, setFilterCat] = useState('')
   const [filterProduct, setFilterProduct] = useState('')
   const today = new Date()
@@ -99,12 +101,12 @@ export default function ExpensesPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl">
       <PageHeader
-        title="Dépenses"
-        description="Suivi des dépenses catégorisées avec totaux et liens optionnels aux produits/lots."
+        title={t('expenses.title')}
+        description={t('expenses.description')}
         action={
           <button onClick={() => { setEditing(null); setShowForm(true) }}
             className="inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
-            <Plus size={16} /> Nouvelle dépense
+            <Plus size={16} /> {t('expenses.new')}
           </button>
         }
       />
@@ -112,11 +114,11 @@ export default function ExpensesPage() {
       {/* Total + breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-white border border-stone-200 rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold mb-1">Total filtré</div>
+          <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold mb-1">{t('expenses.total_filtered')}</div>
           <div className="text-3xl font-bold text-chika-paprika tabular-nums">{fmtCAD(totals.total)}</div>
         </div>
         <div className="bg-white border border-stone-200 rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold mb-2">Par catégorie</div>
+          <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold mb-2">{t('expenses.by_category')}</div>
           <ul className="space-y-1 text-sm">
             {Array.from(totals.byCategory.entries())
               .sort((a, b) => b[1] - a[1])
@@ -135,12 +137,12 @@ export default function ExpensesPage() {
       <div className="bg-white rounded-2xl border border-stone-200 p-4 mb-4 flex items-center gap-3 flex-wrap">
         {/* Période */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Période :</label>
+          <label className="text-sm font-semibold text-stone-700">{t('expenses.filter.period')}</label>
           <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value as 'month' | 'year' | 'all')}
             className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="month">Mois</option>
-            <option value="year">Année</option>
-            <option value="all">Tout l'historique</option>
+            <option value="month">{t('expenses.filter.month')}</option>
+            <option value="year">{t('expenses.filter.year')}</option>
+            <option value="all">{t('expenses.filter.all_history')}</option>
           </select>
           {filterPeriod === 'month' && (
             <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
@@ -152,18 +154,18 @@ export default function ExpensesPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Catégorie :</label>
+          <label className="text-sm font-semibold text-stone-700">{t('expenses.filter.category')}</label>
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
             className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Toutes</option>
+            <option value="">{t('expenses.filter.all_fem')}</option>
             {categories.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-stone-700">Produit :</label>
+          <label className="text-sm font-semibold text-stone-700">{t('expenses.filter.product')}</label>
           <select value={filterProduct} onChange={e => setFilterProduct(e.target.value)}
             className="px-3 py-1.5 border border-stone-300 rounded-lg text-sm">
-            <option value="">Tous</option>
+            <option value="">{t('clients.filter.all')}</option>
             {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -176,19 +178,19 @@ export default function ExpensesPage() {
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
             <tr>
-              <th className="text-left px-4 py-3">Date</th>
-              <th className="text-left px-4 py-3">Catégorie</th>
-              <th className="text-left px-4 py-3">Description</th>
-              <th className="text-left px-4 py-3 hidden sm:table-cell">Fournisseur</th>
-              <th className="text-left px-4 py-3 hidden md:table-cell">Produit</th>
-              <th className="text-right px-4 py-3">Montant</th>
+              <th className="text-left px-4 py-3">{t('expenses.table.date')}</th>
+              <th className="text-left px-4 py-3">{t('expenses.table.category')}</th>
+              <th className="text-left px-4 py-3">{t('expenses.table.description')}</th>
+              <th className="text-left px-4 py-3 hidden sm:table-cell">{t('expenses.table.vendor')}</th>
+              <th className="text-left px-4 py-3 hidden md:table-cell">{t('expenses.table.product')}</th>
+              <th className="text-right px-4 py-3">{t('expenses.table.amount')}</th>
               <th className="px-4 py-3 w-12"></th>
             </tr>
           </thead>
           <tbody>
             {(expenses.data ?? []).map((e: Expense) => (
               <tr key={e.id} className="border-t border-stone-200 hover:bg-stone-50">
-                <td className="px-4 py-3 text-stone-700">{fmtDate(e.expense_date)}</td>
+                <td className="px-4 py-3 text-stone-700">{fmtDate(e.expense_date, lang)}</td>
                 <td className="px-4 py-3">
                   <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-chika-cream text-chika-brown">
                     {e.category_name}
@@ -200,19 +202,19 @@ export default function ExpensesPage() {
                 <td className="px-4 py-3 text-right tabular-nums font-bold text-red-600">−{fmtCAD(e.amount)}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button onClick={() => { setEditing(e); setShowForm(true) }}
-                    className="text-stone-400 hover:text-chika-paprika p-1" title="Modifier">
+                    className="text-stone-400 hover:text-chika-paprika p-1" title={t('action.edit')}>
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => {
-                    if (window.confirm('Supprimer cette dépense ?')) {
+                    if (window.confirm(t('expenses.confirm_delete'))) {
                       deleteExpense(e.id).then(() => qc.invalidateQueries({ queryKey: ['expenses'] }))
                     }
-                  }} className="text-stone-400 hover:text-red-600 p-1" title="Supprimer"><Trash2 size={14} /></button>
+                  }} className="text-stone-400 hover:text-red-600 p-1" title={t('action.delete')}><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
             {expenses.data && expenses.data.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-400">Aucune dépense.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-400">{t('expenses.empty')}</td></tr>
             )}
           </tbody>
         </table>
@@ -238,6 +240,7 @@ function ExpenseForm({ initial, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const t = useT()
   const categories = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [serverError, setServerError] = useState<string | null>(null)
@@ -247,6 +250,25 @@ function ExpenseForm({ initial, onClose, onSaved }: {
     !!(initial && (initial.tps_paid || initial.tvq_paid || initial.expense_type || initial.is_recurring)),
   )
   const today = todayISO()
+
+  const schema = z.object({
+    category_id: z.coerce.number().int().positive(t('validation.required_short')),
+    product_id: z.string().optional(),
+    amount: z.coerce.number().min(0, t('validation.gte_zero')),
+    expense_date: z.string().min(1, t('validation.required_short')),
+    vendor: z.string().optional().or(z.literal('')),
+    description: z.string().min(1, t('validation.required_short')),
+    receipt_url: z.string().optional().or(z.literal('')),
+    tps_paid: z.string().optional().or(z.literal('')),
+    tvq_paid: z.string().optional().or(z.literal('')),
+    vendor_tps_number: z.string().optional().or(z.literal('')),
+    vendor_tvq_number: z.string().optional().or(z.literal('')),
+    expense_type: z.enum(['COGS', 'OPEX', 'CAPEX', '']).optional(),
+    is_recurring: z.boolean().optional(),
+    recurrence_frequency: z.enum(['monthly', 'quarterly', 'yearly', '']).optional(),
+    cca_class: z.string().optional().or(z.literal('')),
+    deductibility_pct: z.coerce.number().int().min(0).max(100).optional(),
+  })
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as never,
@@ -297,7 +319,7 @@ function ExpenseForm({ initial, onClose, onSaved }: {
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -307,40 +329,40 @@ function ExpenseForm({ initial, onClose, onSaved }: {
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier la dépense' : 'Nouvelle dépense'}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? t('expenses.form.edit_title') : t('expenses.new')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
-        <Field label="Catégorie" error={errors.category_id?.message}>
+        <Field label={t('expenses.form.category')} error={errors.category_id?.message}>
           <select {...register('category_id')} className={inputCls}>
-            <option value="">Choisir…</option>
+            <option value="">{t('expenses.form.choose')}</option>
             {categories.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
-        <Field label="Description" error={errors.description?.message}>
-          <input {...register('description')} className={inputCls} placeholder="Ex: Sacs d'arachides 50kg" />
+        <Field label={t('expenses.form.description')} error={errors.description?.message}>
+          <input {...register('description')} className={inputCls} placeholder={t('expenses.form.description_placeholder')} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Montant" error={errors.amount?.message}>
+          <Field label={t('expenses.form.amount')} error={errors.amount?.message}>
             <input type="number" step="0.01" {...register('amount')} className={inputCls} />
           </Field>
-          <Field label="Date" error={errors.expense_date?.message}>
+          <Field label={t('label.date')} error={errors.expense_date?.message}>
             <input type="date" {...register('expense_date')} className={inputCls} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Fournisseur (optionnel)">
+          <Field label={t('expenses.form.vendor_optional')}>
             <input {...register('vendor')} className={inputCls} />
           </Field>
-          <Field label="Produit lié (optionnel)">
+          <Field label={t('expenses.form.linked_product_optional')}>
             <select {...register('product_id')} className={inputCls}>
-              <option value="">Aucun</option>
+              <option value="">{t('expenses.form.none')}</option>
               {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </Field>
         </div>
-        <Field label="Lien reçu (optionnel)">
+        <Field label={t('expenses.form.receipt_link_optional')}>
           <input {...register('receipt_url')} className={inputCls} placeholder="https://…" />
         </Field>
 
@@ -351,26 +373,26 @@ function ExpenseForm({ initial, onClose, onSaved }: {
             onClick={() => setAccountingOpen(o => !o)}
             className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-stone-600 hover:text-chika-paprika"
           >
-            <span>📊 Détails comptables (taxes payées)</span>
+            <span>{t('expenses.form.accounting_toggle')}</span>
             <span className="text-stone-400">{accountingOpen ? '−' : '+'}</span>
           </button>
           {accountingOpen && (
             <div className="mt-3 space-y-4">
               <p className="text-[11px] text-stone-500 italic">
-                Renseigne si tu veux réclamer le CTI/RTI sur cette dépense + classer correctement pour ton comptable.
+                {t('expenses.form.accounting_hint')}
               </p>
               {/* Taxes payées */}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="TPS payée ($)">
+                <Field label={t('expenses.form.tps_paid')}>
                   <input type="number" step="0.01" {...register('tps_paid')} className={inputCls} placeholder="0.00" />
                 </Field>
-                <Field label="TVQ payée ($)">
+                <Field label={t('expenses.form.tvq_paid')}>
                   <input type="number" step="0.01" {...register('tvq_paid')} className={inputCls} placeholder="0.00" />
                 </Field>
-                <Field label="N° TPS fournisseur">
+                <Field label={t('expenses.form.vendor_tps_number')}>
                   <input {...register('vendor_tps_number')} className={inputCls} placeholder="123456789 RT0001" />
                 </Field>
-                <Field label="N° TVQ fournisseur">
+                <Field label={t('expenses.form.vendor_tvq_number')}>
                   <input {...register('vendor_tvq_number')} className={inputCls} placeholder="1234567890 TQ0001" />
                 </Field>
               </div>
@@ -378,25 +400,25 @@ function ExpenseForm({ initial, onClose, onSaved }: {
               {/* Classement comptable */}
               <div className="border-t border-stone-200 pt-3">
                 <div className="text-[10px] uppercase tracking-wider text-stone-500 font-bold mb-2">
-                  Classement comptable
+                  {t('expenses.form.accounting_classification')}
                 </div>
-                <Field label="Type (override catégorie)">
+                <Field label={t('expenses.form.type_override')}>
                   <select {...register('expense_type')} className={inputCls}>
-                    <option value="">— Hérite de la catégorie —</option>
-                    <option value="COGS">COGS — Coût des marchandises vendues</option>
-                    <option value="OPEX">OPEX — Frais d'exploitation</option>
-                    <option value="CAPEX">CAPEX — Immobilisation (à amortir)</option>
+                    <option value="">{t('expenses.form.type_inherit')}</option>
+                    <option value="COGS">{t('expenses.form.type_cogs')}</option>
+                    <option value="OPEX">{t('expenses.form.type_opex')}</option>
+                    <option value="CAPEX">{t('expenses.form.type_capex')}</option>
                   </select>
                 </Field>
                 <div className="grid grid-cols-2 gap-3 mt-3">
-                  <Field label="Déductibilité fiscale">
+                  <Field label={t('expenses.form.deductibility')}>
                     <select {...register('deductibility_pct')} className={inputCls}>
-                      <option value="100">100% (déductible)</option>
-                      <option value="50">50% (ex: repas d'affaires)</option>
-                      <option value="0">0% (non-déductible)</option>
+                      <option value="100">{t('expenses.form.deductibility_100')}</option>
+                      <option value="50">{t('expenses.form.deductibility_50')}</option>
+                      <option value="0">{t('expenses.form.deductibility_0')}</option>
                     </select>
                   </Field>
-                  <Field label="Classe CCA (si CAPEX)">
+                  <Field label={t('expenses.form.cca_class')}>
                     <input {...register('cca_class')} className={inputCls} placeholder="Ex: 8, 10, 50" />
                   </Field>
                 </div>
@@ -406,15 +428,15 @@ function ExpenseForm({ initial, onClose, onSaved }: {
               <div className="border-t border-stone-200 pt-3">
                 <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" {...register('is_recurring')} className="accent-chika-paprika" />
-                  <span className="font-medium">Dépense récurrente (abonnement)</span>
+                  <span className="font-medium">{t('expenses.form.recurring_checkbox')}</span>
                 </label>
                 <div className="mt-2">
-                  <Field label="Fréquence">
+                  <Field label={t('expenses.form.frequency')}>
                     <select {...register('recurrence_frequency')} className={inputCls}>
-                      <option value="">— Non récurrent —</option>
-                      <option value="monthly">Mensuel</option>
-                      <option value="quarterly">Trimestriel</option>
-                      <option value="yearly">Annuel</option>
+                      <option value="">{t('expenses.form.frequency_none')}</option>
+                      <option value="monthly">{t('expenses.form.frequency_monthly')}</option>
+                      <option value="quarterly">{t('expenses.form.frequency_quarterly')}</option>
+                      <option value="yearly">{t('expenses.form.frequency_yearly')}</option>
                     </select>
                   </Field>
                 </div>
@@ -424,10 +446,10 @@ function ExpenseForm({ initial, onClose, onSaved }: {
         </div>
 
         <div className="flex gap-2 justify-end pt-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">Annuler</button>
+          <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">{t('action.cancel')}</button>
           <button type="submit" disabled={isSubmitting}
             className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-            {isSubmitting ? '…' : 'Enregistrer'}
+            {isSubmitting ? '…' : t('action.save')}
           </button>
         </div>
       </form>
@@ -451,12 +473,19 @@ const MONTHS_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
 ]
+const MONTHS_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 /**
  * Panneau "Dépenses récurrentes" — liste les abonnements mensuels et permet
  * de les appliquer en un clic au mois courant (loyer, abonnements logiciels…).
  */
 function RecurringExpensesPanel() {
+  const t = useT()
+  const [lang] = useLang()
+  const MONTHS = lang === 'en' ? MONTHS_EN : MONTHS_FR
   const qc = useQueryClient()
   const now = new Date()
   const [open, setOpen] = useState(false)
@@ -472,10 +501,10 @@ function RecurringExpensesPanel() {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['expenses'] })
       if (r.created === 0 && r.skipped > 0) {
-        setResult(`Tout est déjà à jour — ${r.skipped} dépense(s) déjà présente(s) ce mois-ci.`)
+        setResult(`${t('expenses.recurring.all_up_to_date')} ${r.skipped} ${t('expenses.recurring.already_present_suffix')}`)
       } else {
-        setResult(`✅ ${r.created} dépense(s) ajoutée(s) pour ${MONTHS_FR[now.getMonth()]} ${now.getFullYear()}` +
-          (r.skipped > 0 ? ` · ${r.skipped} déjà présente(s), ignorée(s).` : '.'))
+        setResult(`${t('expenses.recurring.added_prefix')} ${r.created} ${t('expenses.recurring.added_suffix')} ${MONTHS[now.getMonth()]} ${now.getFullYear()}` +
+          (r.skipped > 0 ? ` · ${r.skipped} ${t('expenses.recurring.already_present_short')}` : '.'))
       }
       setTimeout(() => setResult(null), 6000)
     },
@@ -494,7 +523,7 @@ function RecurringExpensesPanel() {
         <div className="flex items-center gap-2.5">
           <RefreshCcw size={16} className="text-chika-paprika" />
           <span className="text-sm font-semibold text-stone-900">
-            Dépenses récurrentes
+            {t('expenses.recurring.title')}
           </span>
           {items.length > 0 && (
             <span className="text-xs bg-chika-paprika/10 text-chika-paprika font-bold px-2 py-0.5 rounded-full">
@@ -509,14 +538,12 @@ function RecurringExpensesPanel() {
         <div className="px-5 pb-4 border-t border-stone-200 pt-3 space-y-3">
           {items.length === 0 ? (
             <p className="text-sm text-stone-500 italic">
-              Aucune dépense récurrente mensuelle. Pour en créer une : nouvelle dépense → section
-              « Détails comptables » → coche « Dépense récurrente » + fréquence « Mensuel ».
+              {t('expenses.recurring.empty')}
             </p>
           ) : (
             <>
               <p className="text-xs text-stone-500">
-                Ces dépenses reviennent chaque mois (loyer, abonnements…). Clique le bouton pour
-                les ajouter d'un coup au mois courant — sans ressaisir.
+                {t('expenses.recurring.hint')}
               </p>
               <ul className="space-y-1.5">
                 {items.map(e => (
@@ -531,7 +558,7 @@ function RecurringExpensesPanel() {
               </ul>
               <div className="flex items-center justify-between pt-1">
                 <span className="text-xs text-stone-500">
-                  Total mensuel : <strong className="text-stone-900">{fmtCAD(totalMonthly)}</strong>
+                  {t('expenses.recurring.monthly_total')} <strong className="text-stone-900">{fmtCAD(totalMonthly)}</strong>
                 </span>
                 <button
                   type="button"
@@ -542,7 +569,7 @@ function RecurringExpensesPanel() {
                   <RefreshCcw size={14} />
                   {apply.isPending
                     ? '…'
-                    : `Appliquer à ${MONTHS_FR[now.getMonth()]} ${now.getFullYear()}`}
+                    : `${t('expenses.recurring.apply_button_prefix')} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`}
                 </button>
               </div>
             </>
