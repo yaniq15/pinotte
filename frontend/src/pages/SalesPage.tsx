@@ -15,23 +15,25 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
-
-const STATUS_META: Record<SaleStatus, { label: string; tone: 'neutral' | 'info' | 'success' | 'danger' }> = {
-  PENDING:   { label: 'En attente', tone: 'neutral' },
-  DELIVERED: { label: 'Livrée',     tone: 'info' },
-  PAID:      { label: 'Payée',      tone: 'success' },
-  CANCELLED: { label: 'Annulée',    tone: 'danger' },
-}
+import { useT, useLang } from '../lib/i18n'
 
 const fmtCAD = (v: number | string) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' })
     .format(typeof v === 'string' ? parseFloat(v) : v)
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
+const fmtDate = (iso: string, lang: 'fr' | 'en' = 'fr') =>
+  new Date(iso).toLocaleDateString(lang === 'en' ? 'en-CA' : 'fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
 
 export default function SalesPage() {
   const qc = useQueryClient()
+  const t = useT()
+  const [lang] = useLang()
+  const STATUS_META: Record<SaleStatus, { label: string; tone: 'neutral' | 'info' | 'success' | 'danger' }> = {
+    PENDING:   { label: t('sales.status.pending'),   tone: 'neutral' },
+    DELIVERED: { label: t('sales.status.delivered'), tone: 'info' },
+    PAID:      { label: t('sales.status.paid'),      tone: 'success' },
+    CANCELLED: { label: t('sales.status.cancelled'), tone: 'danger' },
+  }
   const [filterClient, setFilterClient] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -65,18 +67,18 @@ export default function SalesPage() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      alert(msg || 'Erreur')
+      alert(msg || t('error.generic'))
     },
   })
 
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
-        title="Ventes"
-        description="Bons de vente courtier et magasin direct."
+        title={t('sales.title')}
+        description={t('sales.description')}
         action={
           <Button icon={<Plus size={16} />} onClick={() => setShowForm(true)}>
-            Nouvelle vente
+            {t('sales.new')}
           </Button>
         }
       />
@@ -84,18 +86,18 @@ export default function SalesPage() {
       <Card className="mb-4">
         <div className="p-4 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-stone-600">Client</label>
+            <label className="text-xs font-medium text-stone-600">{t('sales.filter.client')}</label>
             <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
               className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
-              <option value="">Tous</option>
+              <option value="">{t('clients.filter.all')}</option>
               {clients.data?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-stone-600">Statut</label>
+            <label className="text-xs font-medium text-stone-600">{t('sales.filter.status')}</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
               className="px-3 py-1.5 ring-1 ring-stone-300 bg-white rounded-lg text-sm">
-              <option value="">Tous</option>
+              <option value="">{t('clients.filter.all')}</option>
               {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
             </select>
           </div>
@@ -104,21 +106,21 @@ export default function SalesPage() {
 
       <Card>
         {sales.isLoading
-          ? <div className="p-8 text-center text-stone-400 text-sm">Chargement…</div>
+          ? <div className="p-8 text-center text-stone-400 text-sm">{t('label.loading')}</div>
           : sales.data && sales.data.length === 0
-          ? <EmptyState icon="🧾" title="Aucune vente" description="Enregistre ta première vente pour commencer."
-              action={<Button icon={<Plus size={16} />} onClick={() => setShowForm(true)}>Nouvelle vente</Button>} />
+          ? <EmptyState icon="🧾" title={t('sales.empty.title')} description={t('sales.empty.desc')}
+              action={<Button icon={<Plus size={16} />} onClick={() => setShowForm(true)}>{t('sales.new')}</Button>} />
           : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                   <tr>
                     <th className="text-left px-5 py-3">#</th>
-                    <th className="text-left px-5 py-3">Date</th>
-                    <th className="text-left px-5 py-3">Client</th>
-                    <th className="text-left px-5 py-3 hidden sm:table-cell">Articles</th>
-                    <th className="text-right px-5 py-3">Total</th>
-                    <th className="text-left px-5 py-3">Statut</th>
+                    <th className="text-left px-5 py-3">{t('label.date')}</th>
+                    <th className="text-left px-5 py-3">{t('sales.filter.client')}</th>
+                    <th className="text-left px-5 py-3 hidden sm:table-cell">{t('sales.table.articles')}</th>
+                    <th className="text-right px-5 py-3">{t('label.total')}</th>
+                    <th className="text-left px-5 py-3">{t('label.status')}</th>
                     <th className="px-5 py-3"></th>
                   </tr>
                 </thead>
@@ -128,10 +130,10 @@ export default function SalesPage() {
                     return (
                       <tr key={s.id} className="border-t border-stone-200 hover:bg-stone-50 transition">
                         <td className="px-5 py-3 font-mono text-xs text-stone-500">#{s.id}</td>
-                        <td className="px-5 py-3 text-stone-700">{fmtDate(s.sale_date)}</td>
+                        <td className="px-5 py-3 text-stone-700">{fmtDate(s.sale_date, lang)}</td>
                         <td className="px-5 py-3 font-medium text-stone-900">{s.client_name}</td>
                         <td className="px-5 py-3 text-stone-600 hidden sm:table-cell text-xs">
-                          {s.items.map(it => describeLine(it)).join(', ')}
+                          {s.items.map(it => describeLine(it, t)).join(', ')}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-stone-900">
                           <div className="font-semibold">{fmtCAD(s.total_amount)}<span className="text-[10px] text-stone-400 font-normal ml-0.5">HT</span></div>
@@ -140,7 +142,7 @@ export default function SalesPage() {
                         <td className="px-5 py-3">
                           <Badge tone={meta.tone}>{meta.label}</Badge>
                           {s.payment_date && (
-                            <div className="text-[10px] text-stone-400 mt-0.5">Payée le {fmtDate(s.payment_date)}</div>
+                            <div className="text-[10px] text-stone-400 mt-0.5">{t('sales.paid_on')} {fmtDate(s.payment_date, lang)}</div>
                           )}
                         </td>
                         <td className="px-5 py-3 text-right">
@@ -148,40 +150,40 @@ export default function SalesPage() {
                             {s.status !== 'CANCELLED' && (
                               <Button size="sm" variant="ghost" icon={<FileText size={12} />}
                                 onClick={() => downloadInvoice(s)}>
-                                Facture
+                                {t('sales.action.invoice')}
                               </Button>
                             )}
                             {s.status === 'PENDING' && (
                               <Button size="sm" variant="secondary" icon={<Truck size={12} />}
                                 onClick={() => transitionMut.mutate({ id: s.id, status: 'DELIVERED' })}>
-                                Livrée
+                                {t('sales.action.delivered')}
                               </Button>
                             )}
                             {s.status === 'DELIVERED' && (
                               <Button size="sm" variant="primary" icon={<DollarSign size={12} />}
                                 onClick={() => transitionMut.mutate({ id: s.id, status: 'PAID' })}>
-                                Payée
+                                {t('sales.action.paid')}
                               </Button>
                             )}
                             {(s.status === 'PENDING' || s.status === 'DELIVERED') && (
                               <Button size="sm" variant="danger" icon={<Ban size={12} />}
                                 onClick={() => {
-                                  if (window.confirm('Annuler cette vente ? Le stock sera restauré.')) {
+                                  if (window.confirm(t('sales.confirm_cancel'))) {
                                     transitionMut.mutate({ id: s.id, status: 'CANCELLED' })
                                   }
                                 }}>
-                                Annuler
+                                {t('sales.action.cancel_sale')}
                               </Button>
                             )}
                             {s.status !== 'CANCELLED' && (
                               <>
                                 <Button size="sm" variant="ghost" icon={<Tag size={12} />}
                                   onClick={() => setRevisingLotPrice(s)}>
-                                  Prix/lot
+                                  {t('sales.action.lot_price')}
                                 </Button>
                                 <Button size="sm" variant="ghost" icon={<AlertTriangle size={12} />}
                                   onClick={() => setRevisingLoss(s)}>
-                                  Perte
+                                  {t('sales.action.loss')}
                                 </Button>
                               </>
                             )}
@@ -225,13 +227,13 @@ export default function SalesPage() {
 }
 
 /** Résumé lisible d'une ligne de vente pour la colonne "Articles". */
-function describeLine(it: SaleItem): string {
+function describeLine(it: SaleItem, t: (key: string, fallback?: string) => string): string {
   if (it.line_type === 'LOT_ADJUSTMENT') {
     const sign = Number(it.subtotal) < 0 ? '−' : '+'
-    return `${sign}${it.quantity_boxes} lot${it.quantity_boxes > 1 ? 's' : ''} révisés — ${it.product_name}`
+    return `${sign}${it.quantity_boxes} ${t('sales.describe.lots_revised')} — ${it.product_name}`
   }
   if (it.line_type === 'LOSS_ADJUSTMENT') {
-    return `−${it.quantity_boxes} unité${it.quantity_boxes > 1 ? 's' : ''} perte — ${it.product_name}`
+    return `−${it.quantity_boxes} ${t('sales.describe.units_lost')} — ${it.product_name}`
   }
   return `${it.quantity_boxes}× ${it.product_name}`
 }
@@ -243,6 +245,7 @@ interface Line {
 }
 
 function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const t = useT()
   const clients = useQuery({ queryKey: ['clients', ''], queryFn: () => listClients() })
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
 
@@ -318,7 +321,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
 
   const mut = useMutation({
     mutationFn: async () => {
-      if (!clientId) throw new Error('Client requis')
+      if (!clientId) throw new Error(t('validation.client_required'))
       const items: SaleItemPayload[] = lines
         .filter(l => l.product_id !== '' && l.quantity_boxes > 0)
         .map(l => ({
@@ -326,7 +329,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           quantity_boxes: Number(l.quantity_boxes),
           unit_price: Number(l.unit_price),
         }))
-      if (items.length === 0) throw new Error('Au moins une ligne requise')
+      if (items.length === 0) throw new Error(t('validation.at_least_one_line'))
       const payload: SalePayload = {
         client_id: Number(clientId),
         sale_date: saleDate,
@@ -340,7 +343,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
                   || (err as Error)?.message
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -349,51 +352,51 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
       <div onClick={e => e.stopPropagation()}
         className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Nouvelle vente</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('sales.new')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Client">
+          <Field label={t('sales.filter.client')}>
             <select value={clientId} onChange={e => setClientId(e.target.value)} className={inputCls}>
-              <option value="">Choisir…</option>
+              <option value="">{t('sales.form.choose')}</option>
               {clients.data?.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.type === 'BROKER' ? 'Courtier' : 'Magasin'})
+                  {c.name} ({c.type === 'BROKER' ? t('dashboard.client_type.broker') : t('dashboard.client_type.store')})
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Date de vente">
+          <Field label={t('sales.form.sale_date')}>
             <input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} className={inputCls} />
           </Field>
         </div>
 
         {selectedClient && (
           <div className="text-xs text-chika-paprikaDeep bg-chika-creamSoft ring-1 ring-chika-cream px-3 py-2 rounded-lg">
-            Prix unitaire pré-rempli selon le type <strong>{selectedClient.type === 'BROKER' ? 'courtier' : 'direct'}</strong>. Tu peux modifier.
+            {t('sales.form.price_prefill_prefix')} <strong>{selectedClient.type === 'BROKER' ? t('sales.form.type_broker_lc') : t('sales.form.type_direct_lc')}</strong> {t('sales.form.price_prefill_suffix')}
           </div>
         )}
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-stone-700">Articles</label>
-            <button onClick={addLine} type="button" className="text-xs text-chika-paprika hover:underline font-semibold">+ Ajouter une ligne</button>
+            <label className="text-xs font-medium text-stone-700">{t('sales.form.articles_label')}</label>
+            <button onClick={addLine} type="button" className="text-xs text-chika-paprika hover:underline font-semibold">{t('sales.form.add_line')}</button>
           </div>
           <div className="space-y-2">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-[1fr,80px,100px,40px] gap-2 items-center">
                 <select value={l.product_id} onChange={e => pickProduct(i, e.target.value)} className={inputCls}>
-                  <option value="">Produit…</option>
+                  <option value="">{t('sales.form.product_placeholder')}</option>
                   {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input type="number" min="1" value={l.quantity_boxes}
                   onChange={e => updateLine(i, { quantity_boxes: Number(e.target.value) })}
-                  className={`${inputCls} text-right`} placeholder="Bts" />
+                  className={`${inputCls} text-right`} placeholder={t('sales.form.qty_placeholder')} />
                 <input type="number" step="0.01" min="0" value={l.unit_price}
                   onChange={e => updateLine(i, { unit_price: Number(e.target.value) })}
-                  className={`${inputCls} text-right`} placeholder="$/u" />
+                  className={`${inputCls} text-right`} placeholder={t('sales.form.price_placeholder')} />
                 {lines.length > 1 && (
                   <button onClick={() => removeLine(i)} type="button" className="text-stone-400 hover:text-red-600 p-1">
                     <Trash2 size={14} />
@@ -404,50 +407,50 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           </div>
         </div>
 
-        <Field label="Notes (optionnel)">
+        <Field label={t('sales.form.notes_optional')}>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputCls} />
         </Field>
 
         {/* Breakdown HT / Taxes / TTC */}
         <div className="border-t border-stone-200 pt-4 space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-stone-600">Total HT</span>
+            <span className="text-stone-600">{t('sales.form.total_ht')}</span>
             <span className="tabular-nums font-semibold">{fmtCAD(totalHT)}</span>
           </div>
           {taxableHT > 0 ? (
             <>
               <div className="flex justify-between text-[10px] text-stone-400 italic">
-                <span>Dont taxable HT</span>
+                <span>{t('sales.form.taxable_ht')}</span>
                 <span className="tabular-nums">{fmtCAD(taxableHT)}</span>
               </div>
               <div className="flex justify-between text-xs text-stone-500">
-                <span>+ TPS (5 %)</span>
+                <span>{t('sales.form.tps')}</span>
                 <span className="tabular-nums">{fmtCAD(tps)}</span>
               </div>
               <div className="flex justify-between text-xs text-stone-500">
-                <span>+ TVQ (9,975 %)</span>
+                <span>{t('sales.form.tvq')}</span>
                 <span className="tabular-nums">{fmtCAD(tvq)}</span>
               </div>
             </>
           ) : (
             <div className="flex justify-between text-xs text-emerald-700 italic">
-              <span>Tous produits détaxés (épicerie QC)</span>
+              <span>{t('sales.form.all_detaxed')}</span>
               <span>0,00 $</span>
             </div>
           )}
           <div className="flex justify-between border-t border-stone-200 pt-2 mt-1">
-            <span className="text-xs uppercase tracking-wider font-bold text-chika-paprika">Total TTC (à facturer)</span>
+            <span className="text-xs uppercase tracking-wider font-bold text-chika-paprika">{t('sales.form.total_ttc')}</span>
             <span className="text-xl font-bold tabular-nums text-chika-paprika">{fmtCAD(totalTTC)}</span>
           </div>
           <p className="text-[10px] text-stone-400 italic mt-1">
-            Tu factures le TTC. Tu gardes le HT ; la TPS+TVQ collectée ({fmtCAD(tps + tvq)}) sera remise à Revenu Québec trimestriellement.
+            {t('sales.form.tax_hint_prefix')}{fmtCAD(tps + tvq)}{t('sales.form.tax_hint_suffix')}
           </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
-          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
           <Button type="button" disabled={mut.isPending} onClick={() => mut.mutate()}>
-            {mut.isPending ? '…' : 'Créer la vente'}
+            {mut.isPending ? '…' : t('sales.form.create_button')}
           </Button>
         </div>
       </div>
@@ -456,6 +459,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
 }
 
 function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => void; onSaved: () => void }) {
+  const t = useT()
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
 
@@ -505,7 +509,7 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -517,52 +521,51 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
       <div onClick={e => e.stopPropagation()}
         className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Réviser le prix — vente #{sale.id}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('sales.revision.title_prefix')}{sale.id}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         <p className="text-xs text-stone-500">
-          Applique un montant par lot déjà fourni. La facture originale n'est pas modifiée —
-          une ligne de révision s'ajoute, et le nouveau total remplace tout de suite l'ancien partout.
+          {t('sales.revision.description')}
         </p>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
         {noneEligible && (
           <div className="px-3 py-2 rounded-lg bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-sm">
-            Aucun produit de cette vente n'a de "caisses par lot" configuré. Va dans <strong>Produits</strong> pour le régler d'abord.
+            {t('sales.revision.none_eligible_prefix')} <strong>{t('nav.products')}</strong> {t('sales.revision.none_eligible_suffix')}
           </div>
         )}
 
-        <Field label="Type de révision">
+        <Field label={t('sales.revision.type_label')}>
           <div className="flex gap-2">
             <button type="button" onClick={() => setDirection('CREDIT')}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ring-1 ${direction === 'CREDIT' ? 'bg-red-50 ring-red-300 text-red-700' : 'ring-stone-300 text-stone-600'}`}>
-              − Rabais (crédit client)
+              {t('sales.revision.credit_option')}
             </button>
             <button type="button" onClick={() => setDirection('SURCHARGE')}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ring-1 ${direction === 'SURCHARGE' ? 'bg-chika-paprika/10 ring-chika-paprika text-chika-paprika' : 'ring-stone-300 text-stone-600'}`}>
-              + Supplément facturé
+              {t('sales.revision.surcharge_option')}
             </button>
           </div>
         </Field>
 
-        <Field label="Montant par lot ($)">
+        <Field label={t('sales.revision.amount_label')}>
           <input type="number" step="0.01" min="0" value={amountPerLot}
             onChange={e => setAmountPerLot(e.target.value)} className={inputCls} />
         </Field>
 
         {eligibleLines.length > 0 && (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-stone-700">Lots à facturer par ligne</label>
+            <label className="text-xs font-medium text-stone-700">{t('sales.revision.lines_label')}</label>
             {eligibleLines.map(l => (
               <div key={l.item.id} className="grid grid-cols-[1fr,90px,90px,90px] gap-2 items-center text-sm">
                 <div className="text-stone-800">
                   {l.item.product_name}
-                  <div className="text-[10px] text-stone-400">{l.item.quantity_boxes} caisses facturées · {l.product!.boxes_per_lot} caisses/lot</div>
+                  <div className="text-[10px] text-stone-400">{l.item.quantity_boxes} {t('sales.revision.boxes_invoiced')} · {l.product!.boxes_per_lot} {t('sales.revision.boxes_per_lot')}</div>
                 </div>
                 <input type="number" min="0" value={l.lotCount}
                   onChange={e => setLots(s => ({ ...s, [l.item.id]: Math.max(0, Number(e.target.value)) }))}
                   className={`${inputCls} text-right`} />
-                <span className="text-stone-500 text-xs">lots</span>
+                <span className="text-stone-500 text-xs">{t('sales.revision.lots_unit')}</span>
                 <span className={`text-right font-semibold tabular-nums ${direction === 'CREDIT' ? 'text-red-600' : 'text-chika-paprika'}`}>
                   {direction === 'CREDIT' ? '−' : '+'}{fmtCAD(l.lotCount * amount)}
                 </span>
@@ -571,22 +574,22 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
           </div>
         )}
 
-        <Field label="Raison de la révision">
+        <Field label={t('sales.revision.reason_label')}>
           <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className={inputCls}
-            placeholder={direction === 'CREDIT' ? 'Ex. Le client négocie 5$ de rabais par lot déjà fourni.' : 'Ex. Le client accepte 5$ de plus par lot déjà fourni.'} />
+            placeholder={direction === 'CREDIT' ? t('sales.revision.reason_placeholder_credit') : t('sales.revision.reason_placeholder_surcharge')} />
         </Field>
 
         <div className="flex justify-between border-t border-stone-200 pt-3">
-          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">Impact total</span>
+          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">{t('sales.revision.total_impact')}</span>
           <span className={`text-xl font-bold tabular-nums ${direction === 'CREDIT' ? 'text-red-600' : 'text-chika-paprika'}`}>
             {totalImpact >= 0 ? '+' : '−'}{fmtCAD(Math.abs(totalImpact))}
           </span>
         </div>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
-          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
           <Button type="button" disabled={!canSubmit || mut.isPending} onClick={() => mut.mutate()}>
-            {mut.isPending ? '…' : 'Appliquer la révision'}
+            {mut.isPending ? '…' : t('sales.revision.apply')}
           </Button>
         </div>
       </div>
@@ -595,6 +598,7 @@ function LotPriceRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose
 }
 
 function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => void; onSaved: () => void }) {
+  const t = useT()
   const originalItems = sale.items.filter(it => it.line_type === 'PRODUCT')
   const [unitsLost, setUnitsLost] = useState<Record<number, number>>({})
   const [reason, setReason] = useState('')
@@ -615,7 +619,7 @@ function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: ()
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -626,12 +630,11 @@ function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: ()
       <div onClick={e => e.stopPropagation()}
         className="bg-white rounded-xl shadow-xl ring-1 ring-stone-900/5 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Déclarer une perte — vente #{sale.id}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('sales.loss.title_prefix')}{sale.id}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         <p className="text-xs text-stone-500">
-          Crédite le client pour des unités (sacs) perdues/endommagées sur une facture déjà émise —
-          pas besoin qu'une caisse entière soit perdue. Le nouveau total remplace tout de suite l'ancien partout.
+          {t('sales.loss.description')}
         </p>
         {serverError && <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>}
 
@@ -644,13 +647,13 @@ function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: ()
                 <div className="text-stone-800">
                   {it.product_name}
                   <div className="text-[10px] text-stone-400">
-                    {it.quantity_boxes} caisses facturées ({totalUnits} unités) · {fmtCAD(perUnitPrice(it))}/unité
+                    {it.quantity_boxes} {t('sales.loss.boxes_invoiced')} ({totalUnits} {t('sales.loss.units_word')}) · {fmtCAD(perUnitPrice(it))}{t('sales.loss.per_unit')}
                   </div>
                 </div>
                 <input type="number" min="0" max={totalUnits} value={unitsLost[it.id] ?? 0}
                   onChange={e => setUnitsLost(s => ({ ...s, [it.id]: Math.max(0, Number(e.target.value)) }))}
                   className={`${inputCls} text-right`} />
-                <span className="text-stone-500 text-xs">unités</span>
+                <span className="text-stone-500 text-xs">{t('sales.loss.units_word')}</span>
                 <span className="text-right font-semibold tabular-nums text-red-600">
                   {(unitsLost[it.id] ?? 0) > 0 ? `−${fmtCAD((unitsLost[it.id] ?? 0) * perUnitPrice(it))}` : '—'}
                 </span>
@@ -659,25 +662,25 @@ function LossRevisionModal({ sale, onClose, onSaved }: { sale: Sale; onClose: ()
           })}
         </div>
 
-        <Field label="Raison de la perte">
+        <Field label={t('sales.loss.reason_label')}>
           <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} className={inputCls}
-            placeholder="Ex. Carton endommagé pendant le transport." />
+            placeholder={t('sales.loss.reason_placeholder')} />
         </Field>
 
         <div className="px-3 py-2 rounded-lg bg-stone-50 ring-1 ring-stone-200 text-[11px] text-stone-500">
-          Ceci corrige seulement la facture. Si la perte n'est pas déjà déclarée côté stock, pense aussi à
-          l'ajouter dans <Link to="/mouvements" className="text-chika-paprika underline" onClick={onClose}>Mouvements</Link>.
+          {t('sales.loss.stock_hint_prefix')}{' '}
+          {t('sales.loss.stock_hint_suffix')} <Link to="/mouvements" className="text-chika-paprika underline" onClick={onClose}>{t('nav.movements')}</Link>.
         </div>
 
         <div className="flex justify-between border-t border-stone-200 pt-3">
-          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">Crédit total</span>
+          <span className="text-xs uppercase tracking-wider font-bold text-stone-600">{t('sales.loss.total_credit')}</span>
           <span className="text-xl font-bold tabular-nums text-red-600">−{fmtCAD(totalCredit)}</span>
         </div>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
-          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
           <Button type="button" variant="danger" disabled={!canSubmit || mut.isPending} onClick={() => mut.mutate()}>
-            {mut.isPending ? '…' : 'Appliquer le crédit'}
+            {mut.isPending ? '…' : t('sales.loss.apply_credit')}
           </Button>
         </div>
       </div>
