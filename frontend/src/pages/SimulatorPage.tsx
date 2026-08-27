@@ -5,6 +5,7 @@ import { listProducts } from '../api/products'
 import { getRecipe } from '../api/recipes'
 import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { useT } from '../lib/i18n'
 
 const fmtCAD = (v: number) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(v)
@@ -12,6 +13,7 @@ const fmtCAD = (v: number) =>
 type Channel = 'consumer' | 'direct' | 'broker'
 
 export default function SimulatorPage() {
+  const t = useT()
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const [productId, setProductId] = useState('')
   const [costShockPct, setCostShockPct] = useState(0)
@@ -60,17 +62,17 @@ export default function SimulatorPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-5xl">
       <PageHeader
-        title="Simulateur prix-coût"
-        description="Joue avec des hausses de coût matières ou de prix de vente pour voir l'impact instantané sur ta marge."
+        title={t('simulator.title')}
+        description={t('simulator.description')}
       />
 
       <Card className="mb-4">
         <CardBody className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-stone-600 mb-1.5">Produit à simuler</label>
+            <label className="block text-xs font-semibold text-stone-600 mb-1.5">{t('simulator.product_label')}</label>
             <select value={productId} onChange={e => setProductId(e.target.value)}
               className="w-full sm:w-auto px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm bg-white">
-              <option value="">— choisir un produit —</option>
+              <option value="">{t('simulator.choose_product')}</option>
               {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -78,20 +80,20 @@ export default function SimulatorPage() {
           {selectedProduct && (
             <div>
               <label className="block text-xs font-semibold text-stone-600 mb-1.5">
-                Canal de vente <span className="font-normal text-stone-400">— quel prix sert de base à la marge</span>
+                {t('simulator.channel_label')} <span className="font-normal text-stone-400">{t('simulator.channel_sub')}</span>
               </label>
               <div className="inline-flex rounded-lg ring-1 ring-stone-300 overflow-hidden flex-wrap">
                 <ChannelBtn active={channel === 'consumer'} onClick={() => setChannel('consumer')}
-                  label="Consommateur" price={Number(selectedProduct.consumer_price || 0)} />
+                  label={t('simulator.channel.consumer')} price={Number(selectedProduct.consumer_price || 0)} notSetLabel={t('simulator.not_set')} />
                 <ChannelBtn active={channel === 'direct'} onClick={() => setChannel('direct')}
-                  label="Direct magasin" price={Number(selectedProduct.price_direct || 0)} borderLeft />
+                  label={t('simulator.channel.direct')} price={Number(selectedProduct.price_direct || 0)} borderLeft notSetLabel={t('simulator.not_set')} />
                 <ChannelBtn active={channel === 'broker'} onClick={() => setChannel('broker')}
-                  label="Courtier" price={Number(selectedProduct.price_broker || 0)} borderLeft />
+                  label={t('simulator.channel.broker')} price={Number(selectedProduct.price_broker || 0)} borderLeft notSetLabel={t('simulator.not_set')} />
               </div>
               <p className="text-[11px] text-stone-500 mt-1.5">
-                {channel === 'consumer' && 'Prix de détail en magasin (PDS). Ta marge réelle est plus basse si tu vends à un magasin ou un courtier.'}
-                {channel === 'direct' && 'Prix que tu reçois en vendant directement à un magasin. C\'est souvent ton canal le plus rentable.'}
-                {channel === 'broker' && 'Prix que tu reçois via un courtier (commission déduite). C\'est ta marge la plus serrée.'}
+                {channel === 'consumer' && t('simulator.channel_hint.consumer')}
+                {channel === 'direct' && t('simulator.channel_hint.direct')}
+                {channel === 'broker' && t('simulator.channel_hint.broker')}
               </p>
             </div>
           )}
@@ -103,7 +105,7 @@ export default function SimulatorPage() {
           {/* Sliders */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Card>
-              <CardHeader title="Variation du coût matières" subtitle={`Coût actuel : ${fmtCAD(sim.baseCostPerUnit)}/unité`} />
+              <CardHeader title={t('simulator.cost_variation_title')} subtitle={`${t('simulator.cost_variation_subtitle_prefix')} ${fmtCAD(sim.baseCostPerUnit)}${t('simulator.cost_variation_subtitle_suffix')}`} />
               <CardBody>
                 <input type="range" min="-30" max="50" step="1" value={costShockPct}
                   onChange={e => setCostShockPct(Number(e.target.value))}
@@ -116,13 +118,13 @@ export default function SimulatorPage() {
                   <span>+50%</span>
                 </div>
                 <div className="text-xs text-stone-600 mt-2">
-                  → nouveau coût : <strong>{fmtCAD(sim.newCost)}/unité</strong>
+                  {t('simulator.new_cost_prefix')} <strong>{fmtCAD(sim.newCost)}{t('simulator.cost_variation_subtitle_suffix')}</strong>
                 </div>
               </CardBody>
             </Card>
 
             <Card>
-              <CardHeader title="Variation du prix de vente" subtitle={`Prix actuel : ${fmtCAD(sim.basePrice)}/unité`} />
+              <CardHeader title={t('simulator.price_variation_title')} subtitle={`${t('simulator.price_variation_subtitle_prefix')} ${fmtCAD(sim.basePrice)}${t('simulator.cost_variation_subtitle_suffix')}`} />
               <CardBody>
                 <input type="range" min="-30" max="50" step="1" value={priceShockPct}
                   onChange={e => setPriceShockPct(Number(e.target.value))}
@@ -135,7 +137,7 @@ export default function SimulatorPage() {
                   <span>+50%</span>
                 </div>
                 <div className="text-xs text-stone-600 mt-2">
-                  → nouveau prix : <strong>{fmtCAD(sim.newPrice)}/unité</strong>
+                  {t('simulator.new_price_prefix')} <strong>{fmtCAD(sim.newPrice)}{t('simulator.cost_variation_subtitle_suffix')}</strong>
                 </div>
               </CardBody>
             </Card>
@@ -143,23 +145,23 @@ export default function SimulatorPage() {
 
           {/* Comparaison */}
           <Card className="mb-4">
-            <CardHeader title="Comparaison avant / après" />
+            <CardHeader title={t('simulator.comparison_title')} />
             <CardBody>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">Marge actuelle</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{t('simulator.current_margin')}</div>
                   <div className="text-2xl font-bold tabular-nums text-stone-900 mt-1">{sim.baseMarginPct.toFixed(1)}%</div>
-                  <div className="text-xs text-stone-500">{fmtCAD(sim.baseMargin)}/unité</div>
+                  <div className="text-xs text-stone-500">{fmtCAD(sim.baseMargin)}{t('simulator.cost_variation_subtitle_suffix')}</div>
                 </div>
                 <div className="border-x border-stone-200">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">Marge simulée</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{t('simulator.simulated_margin')}</div>
                   <div className={`text-2xl font-bold tabular-nums mt-1 ${
                     sim.diffMarginPct >= 0 ? 'text-emerald-700' : 'text-red-700'
                   }`}>{sim.newMarginPct.toFixed(1)}%</div>
-                  <div className="text-xs text-stone-500">{fmtCAD(sim.newMargin)}/unité</div>
+                  <div className="text-xs text-stone-500">{fmtCAD(sim.newMargin)}{t('simulator.cost_variation_subtitle_suffix')}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">Variation</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{t('simulator.variation')}</div>
                   <div className={`text-2xl font-bold tabular-nums mt-1 inline-flex items-center gap-1 ${
                     sim.diffMarginPct >= 0 ? 'text-emerald-700' : 'text-red-700'
                   }`}>
@@ -175,9 +177,9 @@ export default function SimulatorPage() {
           <Card className="ring-amber-200 bg-amber-50/30">
             <CardBody>
               <div className="text-sm text-amber-900">
-                <strong>💡 Pour garder une marge de {sim.baseMarginPct.toFixed(1)}%</strong> avec le nouveau coût de matières,
-                il faudrait fixer ton prix de vente à <strong className="text-chika-paprika">{fmtCAD(sim.priceToKeepMargin)}/unité</strong>
-                (soit {(((sim.priceToKeepMargin - sim.basePrice) / sim.basePrice) * 100).toFixed(1)}% vs prix actuel).
+                <strong>{t('simulator.reco_prefix')} {sim.baseMarginPct.toFixed(1)}%</strong> {t('simulator.reco_mid')}{' '}
+                <strong className="text-chika-paprika">{fmtCAD(sim.priceToKeepMargin)}{t('simulator.cost_variation_subtitle_suffix')}</strong>
+                {' '}(soit {(((sim.priceToKeepMargin - sim.basePrice) / sim.basePrice) * 100).toFixed(1)}% {t('simulator.reco_suffix')}
               </div>
             </CardBody>
           </Card>
@@ -187,12 +189,13 @@ export default function SimulatorPage() {
   )
 }
 
-function ChannelBtn({ active, onClick, label, price, borderLeft }: {
+function ChannelBtn({ active, onClick, label, price, borderLeft, notSetLabel }: {
   active: boolean
   onClick: () => void
   label: string
   price: number
   borderLeft?: boolean
+  notSetLabel: string
 }) {
   return (
     <button
@@ -204,7 +207,7 @@ function ChannelBtn({ active, onClick, label, price, borderLeft }: {
     >
       {label}
       <span className={`block text-[11px] tabular-nums ${active ? 'text-white/80' : 'text-stone-400'}`}>
-        {price > 0 ? fmtCAD(price) : '— non défini'}
+        {price > 0 ? fmtCAD(price) : notSetLabel}
       </span>
     </button>
   )
