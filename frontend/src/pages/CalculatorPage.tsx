@@ -8,6 +8,7 @@ import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { useT } from '../lib/i18n'
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'unité', 'oz', 'lb']
 
@@ -21,6 +22,7 @@ const fmtCADprecise = (v: number | null | undefined) => {
 }
 
 export default function CalculatorPage() {
+  const t = useT()
   const qc = useQueryClient()
   const products = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => listMaterials() })
@@ -157,7 +159,7 @@ export default function CalculatorPage() {
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      if (!productId) throw new Error('Produit requis')
+      if (!productId) throw new Error(t('validation.product_required'))
       return putRecipe(Number(productId), {
         batch_yield_units: yieldNum > 0 ? yieldNum : null,
         ingredients: buildIngredientsPayload(),
@@ -165,14 +167,14 @@ export default function CalculatorPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipe', productId] })
-      setSuccess('Recette enregistrée ✓')
+      setSuccess(t('calculator.success_saved'))
       setTimeout(() => setSuccess(null), 2500)
     },
   })
 
   const applyMut = useMutation({
     mutationFn: async () => {
-      if (!productId) throw new Error('Produit requis')
+      if (!productId) throw new Error(t('validation.product_required'))
       // Sauve d'abord la recette en BDD pour s'assurer que les modifs locales
       // (rendement + ingrédients + coûts auto) sont prises en compte, PUIS applique le coût.
       await putRecipe(Number(productId), {
@@ -184,12 +186,12 @@ export default function CalculatorPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recipe', productId] })
       qc.invalidateQueries({ queryKey: ['products'] })
-      setSuccess('Recette enregistrée et coût unitaire mis à jour ✓')
+      setSuccess(t('calculator.success_applied'))
       setTimeout(() => setSuccess(null), 3000)
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      alert(msg || 'Erreur')
+      alert(msg || t('error.generic'))
     },
   })
 
@@ -200,18 +202,18 @@ export default function CalculatorPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-7xl">
       <PageHeader
-        title="Calculateur de coût"
-        description="Saisis la recette d'un produit → coût unitaire calculé automatiquement."
+        title={t('calculator.title')}
+        description={t('calculator.description')}
         action={
           productId && (
             <>
               <Button variant="secondary" icon={<Save size={14} />} onClick={() => saveMut.mutate()}
                 disabled={saveMut.isPending}>
-                {saveMut.isPending ? '…' : 'Enregistrer la recette'}
+                {saveMut.isPending ? '…' : t('calculator.save_recipe')}
               </Button>
               <Button icon={<CheckCircle2 size={14} />} onClick={() => applyMut.mutate()}
                 disabled={applyMut.isPending || costPerUnit === null}>
-                {applyMut.isPending ? '…' : 'Appliquer au produit'}
+                {applyMut.isPending ? '…' : t('calculator.apply_to_product')}
               </Button>
             </>
           )
@@ -227,18 +229,18 @@ export default function CalculatorPage() {
       {/* Product selector */}
       <Card className="mb-4">
         <CardBody>
-          <label className="block text-xs font-semibold text-stone-600 mb-1.5">Produit à calculer</label>
+          <label className="block text-xs font-semibold text-stone-600 mb-1.5">{t('calculator.product_label')}</label>
           <select value={productId} onChange={e => setProductId(e.target.value)}
             className="w-full sm:w-auto px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-chika-paprika focus:outline-none">
-            <option value="">— choisir un produit —</option>
+            <option value="">{t('calculator.choose_product')}</option>
             {products.data?.map(p => (
               <option key={p.id} value={p.id}>{p.name} · {p.sku}</option>
             ))}
           </select>
           {selectedProduct && (
             <div className="mt-2 text-xs text-stone-500">
-              Conditionnement : <strong>{selectedProduct.units_per_box} unités / caisse</strong>
-              {' · '}Coût unitaire actuel : <strong className="text-stone-900">{fmtCAD(Number(currentUnitCost))}</strong>
+              {t('calculator.packaging_label')} <strong>{selectedProduct.units_per_box} {t('calculator.units_per_case_suffix')}</strong>
+              {' · '}{t('calculator.current_unit_cost_label')} <strong className="text-stone-900">{fmtCAD(Number(currentUnitCost))}</strong>
             </div>
           )}
         </CardBody>
@@ -248,18 +250,18 @@ export default function CalculatorPage() {
         <>
           {/* Batch yield */}
           <Card className="mb-4">
-            <CardHeader title="Rendement d'un batch"
-              subtitle="Combien d'unités produit UN batch (UN cycle de production complet) ?" />
+            <CardHeader title={t('calculator.yield_title')}
+              subtitle={t('calculator.yield_subtitle')} />
             <CardBody>
               {/* Toggle mode */}
               <div className="flex gap-1.5 mb-3">
                 <button type="button" onClick={() => setYieldMode('direct')}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${yieldMode === 'direct' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
-                  ✏️ Saisie directe
+                  {t('calculator.yield_mode_direct')}
                 </button>
                 <button type="button" onClick={() => setYieldMode('auto')}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${yieldMode === 'auto' ? 'bg-chika-paprika text-white' : 'bg-stone-100 text-stone-600'}`}>
-                  🧮 Calcul auto (masse × conditionnement)
+                  {t('calculator.yield_mode_auto')}
                 </button>
               </div>
 
@@ -267,16 +269,16 @@ export default function CalculatorPage() {
                 <div className="flex items-center gap-3">
                   <input type="number" min="1" value={batchYield} onChange={e => setBatchYield(e.target.value)}
                     className="px-3 py-2 ring-1 ring-stone-300 rounded-lg text-sm w-32 text-right tabular-nums"
-                    placeholder="ex: 23" />
+                    placeholder={t('calculator.yield_placeholder')} />
                   <span className="text-sm text-stone-600">
-                    {selectedProduct?.name ? `bocaux / sacs de ${selectedProduct.name}` : 'unités par batch'}
+                    {selectedProduct?.name ? `${t('calculator.yield_units_product_prefix')} ${selectedProduct.name}` : t('calculator.yield_units_generic')}
                   </span>
                 </div>
               ) : (
                 <div className="space-y-3 bg-chika-creamSoft/50 ring-1 ring-chika-cream rounded-lg p-3">
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Masse totale du batch</label>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">{t('calculator.batch_mass_label')}</label>
                       <div className="flex items-center gap-1 mt-1">
                         <input type="number" min="0" value={batchMassG} onChange={e => setBatchMassG(e.target.value)}
                           className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
@@ -285,7 +287,7 @@ export default function CalculatorPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Masse / sac</label>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">{t('calculator.unit_mass_label')}</label>
                       <div className="flex items-center gap-1 mt-1">
                         <input type="number" min="0" value={unitMassG} onChange={e => setUnitMassG(e.target.value)}
                           className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
@@ -294,7 +296,7 @@ export default function CalculatorPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Pertes / chutes</label>
+                      <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">{t('calculator.loss_label')}</label>
                       <div className="flex items-center gap-1 mt-1">
                         <input type="number" min="0" max="100" step="1" value={lossPct} onChange={e => setLossPct(e.target.value)}
                           className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
@@ -307,18 +309,18 @@ export default function CalculatorPage() {
                   {yieldTheoretical !== null && (
                     <div className="text-xs text-stone-700 bg-white rounded-lg ring-1 ring-stone-300 p-3">
                       <div className="flex justify-between items-center">
-                        <span>Rendement théorique <span className="text-stone-400">({batchMassG} g ÷ {unitMassG} g)</span></span>
-                        <strong className="tabular-nums">{yieldTheoretical} sacs</strong>
+                        <span>{t('calculator.yield_theoretical_label')} <span className="text-stone-400">({batchMassG} g ÷ {unitMassG} g)</span></span>
+                        <strong className="tabular-nums">{yieldTheoretical} {t('calculator.yield_theoretical_unit')}</strong>
                       </div>
                       {Number(lossPct) > 0 && (
                         <div className="flex justify-between items-center mt-1">
-                          <span>Moins pertes {lossPct} %</span>
-                          <span className="tabular-nums text-stone-500">−{yieldTheoretical - (yieldEffective ?? 0)} sacs</span>
+                          <span>{t('calculator.minus_losses_prefix')} {lossPct} %</span>
+                          <span className="tabular-nums text-stone-500">−{yieldTheoretical - (yieldEffective ?? 0)} {t('calculator.yield_theoretical_unit')}</span>
                         </div>
                       )}
                       <div className="flex justify-between items-center mt-2 pt-2 border-t border-stone-200">
-                        <strong>Rendement effectif</strong>
-                        <strong className="tabular-nums text-chika-paprika text-base">{yieldEffective} sacs</strong>
+                        <strong>{t('calculator.yield_effective_label')}</strong>
+                        <strong className="tabular-nums text-chika-paprika text-base">{yieldEffective} {t('calculator.yield_theoretical_unit')}</strong>
                       </div>
                     </div>
                   )}
@@ -326,12 +328,12 @@ export default function CalculatorPage() {
                   <button type="button" onClick={applyAutoYield}
                     disabled={!yieldEffective || yieldEffective <= 0}
                     className="w-full py-2 rounded-lg text-sm font-semibold bg-chika-paprika text-white hover:bg-chika-paprika/90 disabled:opacity-40 disabled:cursor-not-allowed">
-                    Utiliser {yieldEffective ?? '—'} comme rendement
+                    {t('calculator.use_as_yield_prefix')} {yieldEffective ?? '—'} {t('calculator.use_as_yield_suffix')}
                   </button>
 
                   {batchYield && Number(batchYield) > 0 && (
                     <div className="text-[11px] text-stone-500 italic">
-                      Rendement actuellement utilisé pour le calcul : <strong>{batchYield} sacs</strong>
+                      {t('calculator.current_yield_used_prefix')} <strong>{batchYield} {t('calculator.current_yield_used_suffix')}</strong>
                     </div>
                   )}
                 </div>
@@ -341,18 +343,18 @@ export default function CalculatorPage() {
 
           {/* Ingredients */}
           <Card className="mb-4">
-            <CardHeader title="Recette — ingrédients par batch"
-              subtitle="Quantités pour UN batch. Saisis le prix d'achat dans la MÊME unité que la quantité." />
+            <CardHeader title={t('calculator.ingredients_title')}
+              subtitle={t('calculator.ingredients_subtitle')} />
             <CardBody className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                     <tr>
-                      <th className="text-left px-4 py-3">Ingrédient</th>
-                      <th className="text-right px-4 py-3 w-24">Quantité</th>
-                      <th className="text-left px-4 py-3 w-24">Unité</th>
-                      <th className="text-right px-4 py-3 w-32">Prix / unité</th>
-                      <th className="text-right px-4 py-3 w-32">Coût ligne</th>
+                      <th className="text-left px-4 py-3">{t('calculator.table.ingredient')}</th>
+                      <th className="text-right px-4 py-3 w-24">{t('calculator.table.quantity')}</th>
+                      <th className="text-left px-4 py-3 w-24">{t('calculator.table.unit')}</th>
+                      <th className="text-right px-4 py-3 w-32">{t('calculator.table.price_per_unit')}</th>
+                      <th className="text-right px-4 py-3 w-32">{t('calculator.table.line_cost')}</th>
                       <th className="w-12 px-2"></th>
                     </tr>
                   </thead>
@@ -392,7 +394,7 @@ export default function CalculatorPage() {
                             onChange={e => updateLine(i, {
                               unit_price: e.target.value === '' ? null : Number(e.target.value),
                             })}
-                            className={`${inputCls} text-right tabular-nums`} placeholder="$/unité" />
+                            className={`${inputCls} text-right tabular-nums`} placeholder={`$${t('calculator.per_unit_suffix')}`} />
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums font-semibold text-stone-900">
                           {l.lineCost !== null ? fmtCAD(l.lineCost) : <span className="text-stone-300">—</span>}
@@ -410,7 +412,7 @@ export default function CalculatorPage() {
                   <tfoot>
                     <tr className="border-t-2 border-stone-200 bg-stone-50">
                       <td colSpan={4} className="px-4 py-3 text-right text-sm font-semibold text-stone-700">
-                        Coût total du batch
+                        {t('calculator.batch_total_cost')}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-bold text-lg text-chika-paprika">
                         {fmtCAD(totalBatch)}
@@ -422,7 +424,7 @@ export default function CalculatorPage() {
               </div>
               <div className="p-3 border-t border-stone-200">
                 <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addLine}>
-                  Ajouter une ligne
+                  {t('calculator.add_line')}
                 </Button>
               </div>
             </CardBody>
@@ -430,28 +432,28 @@ export default function CalculatorPage() {
 
           {/* Coûts additionnels par sac (emballage + main d'œuvre) */}
           <Card className="mb-4">
-            <CardHeader title="Coûts additionnels par sac"
-              subtitle="Coûts hors matières premières, déjà PAR SAC produit. Ajoutés au coût matières/u." />
+            <CardHeader title={t('calculator.additional_costs_title')}
+              subtitle={t('calculator.additional_costs_subtitle')} />
             <CardBody>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Sac sous vide / emballage</label>
+                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">{t('calculator.packaging_field_label')}</label>
                   <div className="flex items-center gap-1 mt-1">
                     <input type="number" step="0.01" min="0" value={packagingPerUnit}
                       onChange={e => setPackagingPerUnit(e.target.value)}
                       className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
                       placeholder="0.00" />
-                    <span className="text-xs text-stone-500">$/sac</span>
+                    <span className="text-xs text-stone-500">{t('calculator.per_bag_suffix')}</span>
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">Main d'œuvre</label>
+                  <label className="text-[10px] uppercase font-semibold text-stone-500 tracking-wider">{t('calculator.labor_field_label')}</label>
                   <div className="flex items-center gap-1 mt-1">
                     <input type="number" step="0.01" min="0" value={laborPerUnit}
                       onChange={e => setLaborPerUnit(e.target.value)}
                       className="px-2 py-1.5 ring-1 ring-stone-300 rounded-lg text-sm w-full text-right tabular-nums"
                       placeholder="2.50" />
-                    <span className="text-xs text-stone-500">$/sac</span>
+                    <span className="text-xs text-stone-500">{t('calculator.per_bag_suffix')}</span>
                   </div>
                 </div>
               </div>
@@ -459,18 +461,18 @@ export default function CalculatorPage() {
                 <div className="mt-3 text-xs text-stone-600 bg-stone-50 rounded-lg p-3 space-y-1">
                   {pkgPerUnit > 0 && (
                     <div className="flex justify-between">
-                      <span>Emballage : {pkgPerUnit.toFixed(2)} $/sac × {yieldNum} sacs</span>
+                      <span>{t('calculator.packaging_summary_prefix')} {pkgPerUnit.toFixed(2)} {t('calculator.per_bag_mid')} {yieldNum} {t('calculator.bags_suffix')}</span>
                       <strong className="tabular-nums">{fmtCAD(pkgPerUnit * yieldNum)}</strong>
                     </div>
                   )}
                   {lbrPerUnit > 0 && (
                     <div className="flex justify-between">
-                      <span>Main d'œuvre : {lbrPerUnit.toFixed(2)} $/sac × {yieldNum} sacs</span>
+                      <span>{t('calculator.labor_summary_prefix')} {lbrPerUnit.toFixed(2)} {t('calculator.per_bag_mid')} {yieldNum} {t('calculator.bags_suffix')}</span>
                       <strong className="tabular-nums">{fmtCAD(lbrPerUnit * yieldNum)}</strong>
                     </div>
                   )}
                   <div className="flex justify-between pt-1 mt-1 border-t border-stone-200">
-                    <strong>Total additionnel pour ce batch</strong>
+                    <strong>{t('calculator.additional_total_label')}</strong>
                     <strong className="tabular-nums text-chika-paprika">{fmtCAD((pkgPerUnit + lbrPerUnit) * yieldNum)}</strong>
                   </div>
                 </div>
@@ -482,13 +484,13 @@ export default function CalculatorPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardBody>
-                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">Coût par unité</div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">{t('calculator.cost_per_unit_label')}</div>
                 <div className="text-3xl font-bold text-chika-paprika tabular-nums">{fmtCADprecise(costPerUnit)}</div>
                 {costPerUnit !== null && yieldNum > 0 && (
                   <div className="text-[11px] text-stone-500 mt-1 space-y-0.5">
-                    <div>Matières : {fmtCADprecise(matPerUnit)} /u</div>
-                    {pkgPerUnit > 0 && <div>+ Emballage : {fmtCADprecise(pkgPerUnit)} /u</div>}
-                    {lbrPerUnit > 0 && <div>+ Main d'œuvre : {fmtCADprecise(lbrPerUnit)} /u</div>}
+                    <div>{t('calculator.materials_prefix')} {fmtCADprecise(matPerUnit)} {t('calculator.per_unit_suffix')}</div>
+                    {pkgPerUnit > 0 && <div>{t('calculator.packaging_plus_prefix')} {fmtCADprecise(pkgPerUnit)} {t('calculator.per_unit_suffix')}</div>}
+                    {lbrPerUnit > 0 && <div>{t('calculator.labor_plus_prefix')} {fmtCADprecise(lbrPerUnit)} {t('calculator.per_unit_suffix')}</div>}
                   </div>
                 )}
               </CardBody>
@@ -496,11 +498,11 @@ export default function CalculatorPage() {
 
             <Card>
               <CardBody>
-                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">Coût par caisse</div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">{t('calculator.cost_per_box_label')}</div>
                 <div className="text-3xl font-bold text-stone-900 tabular-nums">{fmtCAD(costPerBox)}</div>
                 {costPerBox !== null && (
                   <div className="text-[11px] text-stone-500 mt-1">
-                    × {unitsPerBox} unités / caisse
+                    × {unitsPerBox} {t('calculator.units_per_case_suffix')}
                   </div>
                 )}
               </CardBody>
@@ -508,19 +510,19 @@ export default function CalculatorPage() {
 
             <Card className={costDiff !== null && Math.abs(costDiff) > 0.01 ? 'ring-amber-300 bg-amber-50/30' : ''}>
               <CardBody>
-                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">vs coût actuel</div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">{t('calculator.vs_current_cost_label')}</div>
                 <div className="text-3xl font-bold text-stone-900 tabular-nums">
                   {currentUnitCost !== null ? fmtCAD(Number(currentUnitCost)) : '—'}
-                  <span className="text-[11px] font-normal text-stone-400 ml-1">/u</span>
+                  <span className="text-[11px] font-normal text-stone-400 ml-1">{t('calculator.per_unit_suffix')}</span>
                 </div>
                 {currentUnitCost !== null && unitsPerBox > 0 && (
                   <div className="text-[11px] text-stone-500 mt-1">
-                    = {fmtCAD(Number(currentUnitCost) * unitsPerBox)} / caisse
+                    = {fmtCAD(Number(currentUnitCost) * unitsPerBox)} {t('calculator.equals_per_case_suffix')}
                   </div>
                 )}
                 {costDiff !== null && (
                   <Badge tone={costDiff > 0 ? 'warning' : costDiff < 0 ? 'success' : 'neutral'}>
-                    {costDiff > 0 ? '+' : ''}{fmtCADprecise(costDiff)} /u
+                    {costDiff > 0 ? '+' : ''}{fmtCADprecise(costDiff)} {t('calculator.per_unit_suffix')}
                   </Badge>
                 )}
               </CardBody>
@@ -531,8 +533,8 @@ export default function CalculatorPage() {
           <div className="mt-6 px-4 py-3 rounded-lg bg-blue-50 ring-1 ring-blue-200 text-xs text-blue-900 flex items-start gap-2">
             <Calculator size={14} className="mt-0.5 shrink-0" />
             <div>
-              <strong>Astuce</strong> — pour saisir un prix par kg sur une quantité en g, fais le calcul : 1 kg de pâte d'arachide à 8 $/kg = <code>0,008 $/g</code>.
-              La calculatrice est unit-agnostic : tu peux mélanger les unités tant que <strong>la quantité et le prix sont dans la même unité</strong>.
+              <strong>{t('calculator.tip_title')}</strong> {t('calculator.tip_body_prefix')} <code>0,008 $/g</code>
+              {t('calculator.tip_body_mid')} <strong>{t('calculator.tip_body_bold')}</strong>.
             </div>
           </div>
         </>
@@ -580,6 +582,7 @@ function IngredientPicker({
   onLabelChange: (name: string) => void
   onCreateRequest: (name: string) => void
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState(value)
   const ref = useRef<HTMLDivElement>(null)
@@ -616,13 +619,13 @@ function IngredientPicker({
             type="button"
             onClick={onUnlink}
             className="text-emerald-700/60 hover:text-red-600 shrink-0"
-            title="Délier du catalogue"
+            title={t('calculator.picker.unlink_title')}
           >
             <Link2Off size={12} />
           </button>
         </div>
         <div className="text-[10px] text-emerald-700/70 pl-1">
-          Stock {stock.toFixed(2)} {linked.unit} · PMP {pmp.toFixed(4)} $/{linked.unit}
+          {t('calculator.picker.stock_prefix')} {stock.toFixed(2)} {linked.unit} · {t('calculator.picker.pmp_prefix')} {pmp.toFixed(4)} $/{linked.unit}
         </div>
       </div>
     )
@@ -641,19 +644,19 @@ function IngredientPicker({
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Tape pour chercher une matière…"
+          placeholder={t('calculator.picker.search_placeholder')}
           className={inputCls}
         />
       </div>
       <div className="text-[10px] text-amber-700/80 pl-5">
-        Non lié au catalogue — stock matières ne sera pas décrémenté
+        {t('calculator.picker.not_linked_hint')}
       </div>
 
       {open && (
         <div className="absolute z-30 left-5 right-0 top-full mt-1 bg-white rounded-lg ring-1 ring-stone-300 shadow-xl max-h-72 overflow-y-auto">
           {filtered.length === 0 && !q && (
             <div className="px-3 py-3 text-xs text-stone-500 italic">
-              Aucune matière dans ton catalogue. Crée-en une ci-dessous.
+              {t('calculator.picker.no_materials')}
             </div>
           )}
           {filtered.map(m => (
@@ -676,7 +679,7 @@ function IngredientPicker({
               className="w-full text-left px-3 py-2.5 text-sm font-semibold text-chika-paprika hover:bg-chika-paprika/5 border-t border-stone-200 inline-flex items-center gap-2"
             >
               <Plus size={14} />
-              Créer « {search.trim()} » dans le catalogue
+              {t('calculator.picker.create_prefix')} {search.trim()} {t('calculator.picker.create_suffix')}
             </button>
           )}
         </div>
@@ -696,6 +699,7 @@ function QuickCreateMaterialModal({
   onClose: () => void
   onCreated: (m: Material) => void
 }) {
+  const t = useT()
   const [name, setName] = useState(initialName)
   const [unit, setUnit] = useState('kg')
   const [notes, setNotes] = useState('')
@@ -712,7 +716,7 @@ function QuickCreateMaterialModal({
     onSuccess: onCreated,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur création matière')
+      setServerError(msg || t('calculator.quickcreate.error'))
     },
   })
 
@@ -721,13 +725,13 @@ function QuickCreateMaterialModal({
       <div onClick={e => e.stopPropagation()}
         className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Nouvelle matière première</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('calculator.quickcreate.title')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700">
             <X size={18} />
           </button>
         </div>
         <p className="text-xs text-stone-500">
-          La matière sera ajoutée au catalogue et liée à cette ligne de recette. Le stock initial reste à 0 — tu pourras enregistrer un achat depuis la page Matières.
+          {t('calculator.quickcreate.hint')}
         </p>
 
         {serverError && (
@@ -735,34 +739,34 @@ function QuickCreateMaterialModal({
         )}
 
         <div>
-          <label className="block text-xs font-semibold text-stone-600 mb-1">Nom</label>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">{t('calculator.quickcreate.name_label')}</label>
           <input value={name} onChange={e => setName(e.target.value)} className={inputCls}
-            placeholder="Ex: Arachides crues" autoFocus />
+            placeholder={t('calculator.quickcreate.name_placeholder')} autoFocus />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-stone-600 mb-1">Unité de stockage</label>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">{t('calculator.quickcreate.unit_label')}</label>
           <select value={unit} onChange={e => setUnit(e.target.value)} className={inputCls}>
             {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
           <p className="mt-1 text-[11px] text-stone-500">
-            L'unité dans laquelle tu suivras le stock (ex : kg, L). Tu peux utiliser une autre unité dans la recette si besoin.
+            {t('calculator.quickcreate.unit_hint')}
           </p>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-stone-600 mb-1">Notes (optionnel)</label>
+          <label className="block text-xs font-semibold text-stone-600 mb-1">{t('label.notes')}</label>
           <input value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} />
         </div>
 
         <div className="flex gap-2 justify-end pt-2">
           <button type="button" onClick={onClose}
             className="px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100">
-            Annuler
+            {t('action.cancel')}
           </button>
           <button type="button"
             onClick={() => mut.mutate()}
             disabled={mut.isPending || !name.trim()}
             className="bg-chika-paprika hover:bg-chika-paprikaDeep disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-            {mut.isPending ? '…' : 'Créer et lier'}
+            {mut.isPending ? '…' : t('calculator.quickcreate.submit')}
           </button>
         </div>
       </div>
