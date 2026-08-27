@@ -1,7 +1,9 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { getToken, useCurrentUser } from '../../hooks/useAuth'
+import { useT } from '../../lib/i18n'
 
 export default function ProtectedRoute() {
+  const t = useT()
   const token = getToken()
   const { data, isLoading, isError } = useCurrentUser()
 
@@ -9,7 +11,7 @@ export default function ProtectedRoute() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-sm text-stone-500">
-        Chargement…
+        {t('label.loading')}
       </div>
     )
   }
