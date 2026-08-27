@@ -261,6 +261,38 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     'error.image_unsupported_type': 'Type de fichier non supporté (jpeg/png/webp/gif uniquement)',
     'error.image_too_large': 'Image trop volumineuse (max 5 MB)',
 
+    // Invoice (PDF)
+    'invoice.title': 'FACTURE',
+    'invoice.number_prefix': 'N°',
+    'invoice.date_label': 'Date :',
+    'invoice.paid_on_label': 'Payée le :',
+    'invoice.status_label': 'Statut :',
+    'invoice.billed_to': 'Facturé à',
+    'invoice.default_client': 'Client',
+    'invoice.client_type_broker': 'Courtier / Distributeur',
+    'invoice.client_type_store': 'Magasin',
+    'invoice.tps_number_label': 'N° TPS :',
+    'invoice.col_description': 'Désignation',
+    'invoice.col_qty': 'Qté (caisses)',
+    'invoice.col_price': 'Prix HT/caisse',
+    'invoice.col_total': 'Total HT',
+    'invoice.lot_adjustment_prefix': 'Révision de prix — ',
+    'invoice.loss_adjustment_prefix': 'Crédit perte déclarée — ',
+    'invoice.sku_label': 'SKU :',
+    'invoice.tax_exempt': '(Détaxé — épicerie QC)',
+    'invoice.lot_unit': 'lot(s)',
+    'invoice.unit_unit': 'unité(s)',
+    'invoice.subtotal': 'Sous-total HT',
+    'invoice.of_which_taxable': 'Dont taxable',
+    'invoice.tps_label': 'TPS (5 %)',
+    'invoice.tvq_label': 'TVQ (9,975 %)',
+    'invoice.tax_exempt_products': 'Produits détaxés (épicerie QC)',
+    'invoice.total_due': 'TOTAL À PAYER',
+    'invoice.payment_terms_label': 'Conditions de paiement',
+    'invoice.notes_label': 'Notes',
+    'invoice.tvq_number_label': 'N° TVQ :',
+    'invoice.thanks_prefix': 'Merci pour votre confiance —',
+
     // Dashboard
     'dashboard.greeting': 'Bonjour',
     'dashboard.subtitle': 'Tableau de bord —',
@@ -648,6 +680,38 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     'error.image_unsupported_type': 'Unsupported file type (jpeg/png/webp/gif only)',
     'error.image_too_large': 'Image too large (max 5 MB)',
 
+    // Invoice (PDF)
+    'invoice.title': 'INVOICE',
+    'invoice.number_prefix': 'No.',
+    'invoice.date_label': 'Date:',
+    'invoice.paid_on_label': 'Paid on:',
+    'invoice.status_label': 'Status:',
+    'invoice.billed_to': 'Billed to',
+    'invoice.default_client': 'Client',
+    'invoice.client_type_broker': 'Broker / Distributor',
+    'invoice.client_type_store': 'Store',
+    'invoice.tps_number_label': 'GST No.:',
+    'invoice.col_description': 'Description',
+    'invoice.col_qty': 'Qty (cases)',
+    'invoice.col_price': 'Price excl. tax/case',
+    'invoice.col_total': 'Total excl. tax',
+    'invoice.lot_adjustment_prefix': 'Price revision — ',
+    'invoice.loss_adjustment_prefix': 'Declared loss credit — ',
+    'invoice.sku_label': 'SKU:',
+    'invoice.tax_exempt': '(Tax-exempt — QC groceries)',
+    'invoice.lot_unit': 'lot(s)',
+    'invoice.unit_unit': 'unit(s)',
+    'invoice.subtotal': 'Subtotal excl. tax',
+    'invoice.of_which_taxable': 'Of which taxable',
+    'invoice.tps_label': 'GST (5%)',
+    'invoice.tvq_label': 'QST (9.975%)',
+    'invoice.tax_exempt_products': 'Tax-exempt products (QC groceries)',
+    'invoice.total_due': 'TOTAL DUE',
+    'invoice.payment_terms_label': 'Payment terms',
+    'invoice.notes_label': 'Notes',
+    'invoice.tvq_number_label': 'QST No.:',
+    'invoice.thanks_prefix': 'Thank you for your trust —',
+
     // Dashboard
     'dashboard.greeting': 'Hello',
     'dashboard.subtitle': 'Dashboard —',
@@ -831,4 +895,9 @@ export function useT() {
 export function useLang(): [Lang, (l: Lang) => void] {
   const lang = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   return [lang, setLang]
+}
+
+/** Traduction imperative (hors composant React) — ex. génération de PDF. */
+export function tFor(lang: Lang, key: string, fallback?: string): string {
+  return STRINGS[lang]?.[key] || fallback || key
 }

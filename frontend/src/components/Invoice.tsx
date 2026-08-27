@@ -3,6 +3,7 @@ import {
 } from '@react-pdf/renderer'
 import type { Sale } from '../api/sales'
 import { loadCompanyInfo } from '../lib/companyInfo'
+import { getLang, tFor } from '../lib/i18n'
 
 const TPS_RATE = 0.05
 const TVQ_RATE = 0.09975
@@ -34,13 +35,13 @@ const styles = StyleSheet.create({
   paymentTermsLabel: { fontWeight: 'bold', marginBottom: 2 },
 })
 
-function fmtMoney(n: number): string {
-  return `${n.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
+function fmtMoney(n: number, lang: 'fr' | 'en'): string {
+  return `${n.toLocaleString(lang === 'en' ? 'en-CA' : 'fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
 }
 
-function fmtDate(s: string): string {
+function fmtDate(s: string, lang: 'fr' | 'en'): string {
   const d = new Date(s)
-  return d.toLocaleDateString('fr-CA', { day: '2-digit', month: 'long', year: 'numeric' })
+  return d.toLocaleDateString(lang === 'en' ? 'en-CA' : 'fr-CA', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
 interface InvoiceProps {
@@ -50,6 +51,8 @@ interface InvoiceProps {
 }
 
 export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: InvoiceProps) {
+  const lang = getLang()
+  const t = (key: string, fallback?: string) => tFor(lang, key, fallback)
   const COMPANY = loadCompanyInfo()
   const totalHT = Number(sale.total_amount)
   // Taxes calculées uniquement sur la portion taxable (non-épicerie)
@@ -80,33 +83,33 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
             )}
           </View>
           <View>
-            <Text style={styles.invoiceTitle}>FACTURE</Text>
-            <Text style={styles.invoiceMeta}>N° {invoiceNum}</Text>
-            <Text style={styles.invoiceMeta}>Date : {fmtDate(sale.sale_date)}</Text>
+            <Text style={styles.invoiceTitle}>{t('invoice.title')}</Text>
+            <Text style={styles.invoiceMeta}>{t('invoice.number_prefix')} {invoiceNum}</Text>
+            <Text style={styles.invoiceMeta}>{t('invoice.date_label')} {fmtDate(sale.sale_date, lang)}</Text>
             {sale.payment_date && (
-              <Text style={styles.invoiceMeta}>Payée le : {fmtDate(sale.payment_date)}</Text>
+              <Text style={styles.invoiceMeta}>{t('invoice.paid_on_label')} {fmtDate(sale.payment_date, lang)}</Text>
             )}
-            <Text style={styles.invoiceMeta}>Statut : {sale.status}</Text>
+            <Text style={styles.invoiceMeta}>{t('invoice.status_label')} {t(`sales.status.${sale.status.toLowerCase()}`, sale.status)}</Text>
           </View>
         </View>
 
         {/* Client */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Facturé à</Text>
-          <Text style={styles.clientName}>{sale.client_name || 'Client'}</Text>
-          {sale.client_type === 'BROKER' && <Text style={styles.companyLine}>Courtier / Distributeur</Text>}
-          {sale.client_type === 'STORE' && <Text style={styles.companyLine}>Magasin</Text>}
+          <Text style={styles.sectionLabel}>{t('invoice.billed_to')}</Text>
+          <Text style={styles.clientName}>{sale.client_name || t('invoice.default_client')}</Text>
+          {sale.client_type === 'BROKER' && <Text style={styles.companyLine}>{t('invoice.client_type_broker')}</Text>}
+          {sale.client_type === 'STORE' && <Text style={styles.companyLine}>{t('invoice.client_type_store')}</Text>}
           {clientAddress && <Text style={styles.companyLine}>{clientAddress}</Text>}
-          {clientTPSNumber && <Text style={styles.companyLine}>N° TPS : {clientTPSNumber}</Text>}
+          {clientTPSNumber && <Text style={styles.companyLine}>{t('invoice.tps_number_label')} {clientTPSNumber}</Text>}
         </View>
 
         {/* Items */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={styles.colDesc}>Désignation</Text>
-            <Text style={styles.colQty}>Qté (caisses)</Text>
-            <Text style={styles.colPrice}>Prix HT/caisse</Text>
-            <Text style={styles.colTotal}>Total HT</Text>
+            <Text style={styles.colDesc}>{t('invoice.col_description')}</Text>
+            <Text style={styles.colQty}>{t('invoice.col_qty')}</Text>
+            <Text style={styles.colPrice}>{t('invoice.col_price')}</Text>
+            <Text style={styles.colTotal}>{t('invoice.col_total')}</Text>
           </View>
           {sale.items.map(it => {
             const isAdjustment = it.line_type !== 'PRODUCT'
@@ -115,23 +118,23 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
               <View key={it.id} style={styles.tableRow}>
                 <View style={styles.colDesc}>
                   <Text style={{ fontWeight: 'bold' }}>
-                    {it.line_type === 'LOT_ADJUSTMENT' && 'Révision de prix — '}
-                    {it.line_type === 'LOSS_ADJUSTMENT' && 'Crédit perte déclarée — '}
+                    {it.line_type === 'LOT_ADJUSTMENT' && t('invoice.lot_adjustment_prefix')}
+                    {it.line_type === 'LOSS_ADJUSTMENT' && t('invoice.loss_adjustment_prefix')}
                     {it.product_name || `Produit ${it.product_id}`}
                   </Text>
-                  {!isAdjustment && it.product_sku && <Text style={{ fontSize: 8, color: '#78716c' }}>SKU : {it.product_sku}</Text>}
+                  {!isAdjustment && it.product_sku && <Text style={{ fontSize: 8, color: '#78716c' }}>{t('invoice.sku_label')} {it.product_sku}</Text>}
                   {!isAdjustment && !it.product_taxable && (
-                    <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>(Détaxé — épicerie QC)</Text>
+                    <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>{t('invoice.tax_exempt')}</Text>
                   )}
                   {isAdjustment && it.notes && (
                     <Text style={{ fontSize: 8, color: '#78716c', fontStyle: 'italic' }}>{it.notes}</Text>
                   )}
                 </View>
                 <Text style={styles.colQty}>
-                  {it.quantity_boxes}{it.line_type === 'LOT_ADJUSTMENT' ? ' lot(s)' : it.line_type === 'LOSS_ADJUSTMENT' ? ' unité(s)' : ''}
+                  {it.quantity_boxes}{it.line_type === 'LOT_ADJUSTMENT' ? ` ${t('invoice.lot_unit')}` : it.line_type === 'LOSS_ADJUSTMENT' ? ` ${t('invoice.unit_unit')}` : ''}
                 </Text>
-                <Text style={styles.colPrice}>{fmtMoney(Number(it.unit_price))}</Text>
-                <Text style={[styles.colTotal, negative ? { color: '#dc2626' } : {}]}>{fmtMoney(Number(it.subtotal))}</Text>
+                <Text style={styles.colPrice}>{fmtMoney(Number(it.unit_price), lang)}</Text>
+                <Text style={[styles.colTotal, negative ? { color: '#dc2626' } : {}]}>{fmtMoney(Number(it.subtotal), lang)}</Text>
               </View>
             )
           })}
@@ -140,45 +143,45 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
         {/* Totaux */}
         <View style={styles.totals}>
           <View style={styles.totalRow}>
-            <Text>Sous-total HT</Text>
-            <Text>{fmtMoney(totalHT)}</Text>
+            <Text>{t('invoice.subtotal')}</Text>
+            <Text>{fmtMoney(totalHT, lang)}</Text>
           </View>
           {hasTaxableItems && hasNonTaxableItems && (
             <View style={[styles.totalRow, { fontSize: 8, color: '#78716c', fontStyle: 'italic' }]}>
-              <Text>Dont taxable</Text>
-              <Text>{fmtMoney(taxableHT)}</Text>
+              <Text>{t('invoice.of_which_taxable')}</Text>
+              <Text>{fmtMoney(taxableHT, lang)}</Text>
             </View>
           )}
           {hasTaxableItems ? (
             <>
               <View style={styles.totalRow}>
-                <Text>TPS (5 %)</Text>
-                <Text>{fmtMoney(tps)}</Text>
+                <Text>{t('invoice.tps_label')}</Text>
+                <Text>{fmtMoney(tps, lang)}</Text>
               </View>
               <View style={styles.totalRow}>
-                <Text>TVQ (9,975 %)</Text>
-                <Text>{fmtMoney(tvq)}</Text>
+                <Text>{t('invoice.tvq_label')}</Text>
+                <Text>{fmtMoney(tvq, lang)}</Text>
               </View>
             </>
           ) : (
             <View style={[styles.totalRow, { fontSize: 9, color: '#10b981', fontStyle: 'italic' }]}>
-              <Text>Produits détaxés (épicerie QC)</Text>
-              <Text>0,00 $</Text>
+              <Text>{t('invoice.tax_exempt_products')}</Text>
+              <Text>{fmtMoney(0, lang)}</Text>
             </View>
           )}
           <View style={styles.totalRowFinal}>
-            <Text>TOTAL À PAYER</Text>
-            <Text>{fmtMoney(totalTTC)}</Text>
+            <Text>{t('invoice.total_due')}</Text>
+            <Text>{fmtMoney(totalTTC, lang)}</Text>
           </View>
         </View>
 
         {/* Conditions de paiement */}
         <View style={styles.paymentTerms}>
-          <Text style={styles.paymentTermsLabel}>Conditions de paiement</Text>
+          <Text style={styles.paymentTermsLabel}>{t('invoice.payment_terms_label')}</Text>
           <Text>{COMPANY.paymentTerms}</Text>
           {sale.notes && (
             <>
-              <Text style={[styles.paymentTermsLabel, { marginTop: 6 }]}>Notes</Text>
+              <Text style={[styles.paymentTermsLabel, { marginTop: 6 }]}>{t('invoice.notes_label')}</Text>
               <Text>{sale.notes}</Text>
             </>
           )}
@@ -188,16 +191,16 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
         {(COMPANY.tpsNumber || COMPANY.tvqNumber) && (
           <View style={styles.taxNumbers}>
             <Text>
-              {COMPANY.tpsNumber && `N° TPS : ${COMPANY.tpsNumber}`}
+              {COMPANY.tpsNumber && `${t('invoice.tps_number_label')} ${COMPANY.tpsNumber}`}
               {COMPANY.tpsNumber && COMPANY.tvqNumber && '    ·    '}
-              {COMPANY.tvqNumber && `N° TVQ : ${COMPANY.tvqNumber}`}
+              {COMPANY.tvqNumber && `${t('invoice.tvq_number_label')} ${COMPANY.tvqNumber}`}
             </Text>
           </View>
         )}
 
         {/* Footer */}
         <Text style={styles.footer}>
-          Merci pour votre confiance — {COMPANY.name} · {COMPANY.email}
+          {t('invoice.thanks_prefix')} {COMPANY.name} · {COMPANY.email}
         </Text>
       </Page>
     </Document>
