@@ -510,6 +510,19 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     'validation.product_required': 'Produit requis',
     'validation.gte_zero': '≥ 0',
 
+    // Batch Labels (modale — le contenu imprimé reste en français, voir composant)
+    'batchlabels.title_prefix': 'Étiquettes du lot',
+    'batchlabels.default_product': 'Produit',
+    'batchlabels.format_label': 'Format',
+    'batchlabels.format_small': 'Petite · 24/page (sacs)',
+    'batchlabels.format_large': 'Grande · 2/page (cartons)',
+    'batchlabels.quantity_label': 'Quantité d\'étiquettes',
+    'batchlabels.print_button': 'Imprimer',
+    'batchlabels.hint_prefix': 'Astuce : le contenu des étiquettes (marque, dates, code-barres) se configure dans',
+    'batchlabels.hint_link': 'Profil → Étiquettes de lot',
+    'batchlabels.hint_suffix': '. Dans la fenêtre d\'impression, choisis « Marges : aucune » et désactive en-tête/pied de page.',
+    'batchlabels.preview_label': 'Aperçu',
+
     // Dashboard
     'dashboard.greeting': 'Bonjour',
     'dashboard.subtitle': 'Tableau de bord —',
@@ -1145,6 +1158,19 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     'batches.form.submit': 'Create batch',
     'validation.product_required': 'Product required',
     'validation.gte_zero': '≥ 0',
+
+    // Batch Labels (modal — printed label content stays French, see component)
+    'batchlabels.title_prefix': 'Labels for batch',
+    'batchlabels.default_product': 'Product',
+    'batchlabels.format_label': 'Format',
+    'batchlabels.format_small': 'Small · 24/page (bags)',
+    'batchlabels.format_large': 'Large · 2/page (cartons)',
+    'batchlabels.quantity_label': 'Number of labels',
+    'batchlabels.print_button': 'Print',
+    'batchlabels.hint_prefix': 'Tip: label content (brand, dates, barcode) is configured in',
+    'batchlabels.hint_link': 'Profile → Batch labels',
+    'batchlabels.hint_suffix': '. In the print dialog, choose "Margins: none" and disable header/footer.',
+    'batchlabels.preview_label': 'Preview',
 
     // Dashboard
     'dashboard.greeting': 'Hello',

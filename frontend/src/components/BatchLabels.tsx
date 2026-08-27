@@ -6,6 +6,7 @@ import { listProducts } from '../api/products'
 import { resolveImageUrl } from '../lib/axios'
 import { loadLabelSettings, type LabelFormat, type LabelSettings } from '../lib/labelSettings'
 import { Barcode } from './ui/Barcode'
+import { useT } from '../lib/i18n'
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -16,6 +17,7 @@ const daysUntil = (iso: string) => {
 }
 
 export default function BatchLabels({ batch, onClose }: { batch: Batch; onClose: () => void }) {
+  const t = useT()
   // Préférences d'étiquettes — configurées dans Profil
   const settings = useMemo(() => loadLabelSettings(), [])
   const [size, setSize] = useState<LabelFormat>(settings.defaultFormat)
@@ -45,46 +47,45 @@ export default function BatchLabels({ batch, onClose }: { batch: Batch; onClose:
         className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-stone-900">Étiquettes du lot {batch.batch_number}</h3>
-            <p className="text-xs text-stone-500">{batch.product_name ?? 'Produit'}</p>
+            <h3 className="text-lg font-bold text-stone-900">{t('batchlabels.title_prefix')} {batch.batch_number}</h3>
+            <p className="text-xs text-stone-500">{batch.product_name ?? t('batchlabels.default_product')}</p>
           </div>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
 
         <div className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="block text-xs font-semibold text-stone-600 mb-1">Format</label>
+            <label className="block text-xs font-semibold text-stone-600 mb-1">{t('batchlabels.format_label')}</label>
             <div className="inline-flex rounded-lg border border-stone-300 overflow-hidden">
               <button type="button" onClick={() => setSize('small')}
                 className={`px-3 py-1.5 text-sm ${size === 'small' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700'}`}>
-                Petite · 24/page (sacs)
+                {t('batchlabels.format_small')}
               </button>
               <button type="button" onClick={() => setSize('large')}
                 className={`px-3 py-1.5 text-sm border-l border-stone-300 ${size === 'large' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-700'}`}>
-                Grande · 2/page (cartons)
+                {t('batchlabels.format_large')}
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-stone-600 mb-1">Quantité d'étiquettes</label>
+            <label className="block text-xs font-semibold text-stone-600 mb-1">{t('batchlabels.quantity_label')}</label>
             <input type="number" min={1} max={240} value={count}
               onChange={e => setCount(Math.max(1, Math.min(240, Number(e.target.value) || 1)))}
               className="w-28 px-3 py-1.5 border border-stone-300 rounded-lg text-sm" />
           </div>
           <button type="button" onClick={handlePrint}
             className="ml-auto inline-flex items-center gap-1.5 bg-chika-paprika hover:bg-chika-paprikaDeep text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
-            <Printer size={16} /> Imprimer
+            <Printer size={16} /> {t('batchlabels.print_button')}
           </button>
         </div>
 
         <div className="text-xs text-stone-500">
-          Astuce : le contenu des étiquettes (marque, dates, code-barres) se configure dans
-          <strong> Profil → Étiquettes de lot</strong>. Dans la fenêtre d'impression, choisis
-          « Marges : aucune » et désactive en-tête/pied de page.
+          {t('batchlabels.hint_prefix')}
+          <strong> {t('batchlabels.hint_link')}</strong>{t('batchlabels.hint_suffix')}
         </div>
 
         <div className="border-t border-stone-200 pt-3">
-          <div className="text-[11px] uppercase tracking-wider text-stone-500 mb-2">Aperçu</div>
+          <div className="text-[11px] uppercase tracking-wider text-stone-500 mb-2">{t('batchlabels.preview_label')}</div>
           <div className="bg-stone-100 p-4 rounded-lg max-h-[55vh] overflow-y-auto">
             <div className={size === 'small' ? 'labels-grid-small' : 'labels-grid-large'}>
               {labels.map((_, i) => <LabelCard key={i} {...cardProps} />)}
