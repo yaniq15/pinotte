@@ -12,6 +12,7 @@ import { PageHeader } from '../components/shared/AppLayout'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { useT, useLang } from '../lib/i18n'
 
 function fmtCAD(n: number | string | null | undefined): string {
   if (n == null || n === '') return '—'
@@ -25,12 +26,14 @@ function fmtNum(n: number | string | null | undefined, decimals = 3): string {
   return num.toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: decimals })
 }
 
-function fmtDate(s: string): string {
-  return new Date(s).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
+function fmtDate(s: string, lang: 'fr' | 'en'): string {
+  return new Date(s).toLocaleDateString(lang === 'en' ? 'en-CA' : 'fr-CA', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export default function MaterialsPage() {
   const qc = useQueryClient()
+  const t = useT()
+  const [lang] = useLang()
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const [showPurchaseForm, setShowPurchaseForm] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
@@ -52,7 +55,7 @@ export default function MaterialsPage() {
   }).length || 0
 
   async function handleDeleteMaterial(m: Material) {
-    if (!window.confirm(`Supprimer "${m.name}" ? Tous les achats associés seront aussi supprimés.`)) return
+    if (!window.confirm(t('materials.confirm_delete').replace('{name}', m.name))) return
     try {
       await deleteMaterial(m.id)
       qc.invalidateQueries({ queryKey: ['materials'] })
@@ -60,22 +63,22 @@ export default function MaterialsPage() {
       if (selectedMaterial?.id === m.id) setSelectedMaterial(null)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      alert(msg || 'Erreur')
+      alert(msg || t('error.generic'))
     }
   }
 
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
       <PageHeader
-        title="Matières premières"
-        description="Stock de tes ingrédients + approvisionnements. Prix moyen pondéré auto-calculé."
+        title={t('materials.title')}
+        description={t('materials.description')}
         action={
           <>
             <Button variant="secondary" icon={<Plus size={14} />} onClick={() => setShowMaterialForm(true)}>
-              Nouvelle matière
+              {t('materials.new')}
             </Button>
             <Button icon={<ShoppingCart size={14} />} onClick={() => setShowPurchaseForm(true)}>
-              Approvisionnement
+              {t('materials.supply')}
             </Button>
           </>
         }
@@ -85,7 +88,7 @@ export default function MaterialsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardBody>
-            <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">Matières actives</div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{t('materials.kpi.active')}</div>
             <div className="text-2xl font-bold text-stone-900 tabular-nums mt-1">
               {materials.data?.filter(m => !m.archived).length ?? '—'}
             </div>
@@ -93,14 +96,14 @@ export default function MaterialsPage() {
         </Card>
         <Card>
           <CardBody>
-            <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">Valeur stock</div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{t('materials.kpi.stock_value')}</div>
             <div className="text-2xl font-bold text-chika-paprika tabular-nums mt-1">{fmtCAD(totalStockValue)}</div>
           </CardBody>
         </Card>
         <Card className={lowStockCount > 0 ? 'ring-amber-200 bg-amber-50/50' : ''}>
           <CardBody>
             <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold flex items-center gap-1">
-              <AlertTriangle size={10} /> Alertes stock bas
+              <AlertTriangle size={10} /> {t('materials.kpi.low_stock_alerts')}
             </div>
             <div className={`text-2xl font-bold tabular-nums mt-1 ${lowStockCount > 0 ? 'text-amber-700' : 'text-stone-900'}`}>
               {lowStockCount}
@@ -112,20 +115,20 @@ export default function MaterialsPage() {
       {/* Liste matières + détails */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
-          <CardHeader title="Catalogue" subtitle="Cliquer pour voir l'historique d'achats" />
+          <CardHeader title={t('materials.catalog_title')} subtitle={t('materials.catalog_subtitle')} />
           <CardBody className="p-0">
-            {materials.isLoading && <div className="p-6 text-stone-400 text-sm">Chargement…</div>}
+            {materials.isLoading && <div className="p-6 text-stone-400 text-sm">{t('label.loading')}</div>}
             {materials.data && materials.data.length === 0 && (
-              <div className="p-6 text-stone-500 text-sm italic">Aucune matière. Crée ta première matière ci-dessus.</div>
+              <div className="p-6 text-stone-500 text-sm italic">{t('materials.empty')}</div>
             )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="text-left px-4 py-3">Nom</th>
-                    <th className="text-right px-4 py-3">Stock</th>
-                    <th className="text-right px-4 py-3">PMP</th>
-                    <th className="text-right px-4 py-3">Valeur</th>
+                    <th className="text-left px-4 py-3">{t('label.name')}</th>
+                    <th className="text-right px-4 py-3">{t('materials.table.stock')}</th>
+                    <th className="text-right px-4 py-3">{t('materials.table.pmp')}</th>
+                    <th className="text-right px-4 py-3">{t('materials.table.value')}</th>
                     <th className="w-20 px-2"></th>
                   </tr>
                 </thead>
@@ -144,7 +147,7 @@ export default function MaterialsPage() {
                         <td className="px-4 py-3">
                           <div className="font-medium text-stone-900">{m.name}</div>
                           {isLow && (
-                            <Badge tone="warning">⚠ Stock bas</Badge>
+                            <Badge tone="warning">{t('materials.low_stock_badge')}</Badge>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
@@ -157,11 +160,11 @@ export default function MaterialsPage() {
                         <td className="px-2 py-3">
                           <div className="flex gap-1">
                             <button onClick={e => { e.stopPropagation(); setEditingMaterial(m) }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 hover:bg-chika-paprika hover:text-white text-stone-700 text-xs font-medium" title="Modifier">
-                              <Pencil size={12} /> Modifier
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 hover:bg-chika-paprika hover:text-white text-stone-700 text-xs font-medium" title={t('action.edit')}>
+                              <Pencil size={12} /> {t('action.edit')}
                             </button>
                             <button onClick={e => { e.stopPropagation(); handleDeleteMaterial(m) }}
-                              className="inline-flex items-center px-2 py-1 rounded-md bg-stone-100 hover:bg-red-600 hover:text-white text-stone-700" title="Supprimer">
+                              className="inline-flex items-center px-2 py-1 rounded-md bg-stone-100 hover:bg-red-600 hover:text-white text-stone-700" title={t('action.delete')}>
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -178,28 +181,28 @@ export default function MaterialsPage() {
         {/* Détails matière sélectionnée */}
         <Card>
           <CardHeader
-            title={selectedMaterial ? selectedMaterial.name : 'Détails'}
-            subtitle={selectedMaterial ? `Historique d'achats` : 'Sélectionne une matière'} />
+            title={selectedMaterial ? selectedMaterial.name : t('materials.details_title')}
+            subtitle={selectedMaterial ? t('materials.purchase_history') : t('materials.select_prompt')} />
           <CardBody className="p-0">
             {!selectedMaterial && (
-              <div className="p-6 text-stone-400 text-sm italic">Sélectionne une matière dans le catalogue.</div>
+              <div className="p-6 text-stone-400 text-sm italic">{t('materials.select_hint')}</div>
             )}
             {selectedMaterial && (
               <>
                 <div className="px-4 py-3 bg-chika-creamSoft/30 border-b border-stone-200 text-xs space-y-1">
-                  <div className="flex justify-between"><span>Stock</span><strong>{fmtNum(selectedMaterial.current_stock)} {selectedMaterial.unit}</strong></div>
-                  <div className="flex justify-between"><span>PMP</span><strong>{fmtCAD(selectedMaterial.weighted_avg_price)}/{selectedMaterial.unit}</strong></div>
-                  <div className="flex justify-between"><span>Valeur stock</span>
+                  <div className="flex justify-between"><span>{t('materials.table.stock')}</span><strong>{fmtNum(selectedMaterial.current_stock)} {selectedMaterial.unit}</strong></div>
+                  <div className="flex justify-between"><span>{t('materials.table.pmp')}</span><strong>{fmtCAD(selectedMaterial.weighted_avg_price)}/{selectedMaterial.unit}</strong></div>
+                  <div className="flex justify-between"><span>{t('materials.kpi.stock_value')}</span>
                     <strong className="text-chika-paprika">{fmtCAD(Number(selectedMaterial.current_stock) * Number(selectedMaterial.weighted_avg_price))}</strong>
                   </div>
                 </div>
                 <div className="max-h-96 overflow-y-auto">
-                  {purchases.isLoading && <div className="p-4 text-stone-400 text-sm">Chargement…</div>}
+                  {purchases.isLoading && <div className="p-4 text-stone-400 text-sm">{t('label.loading')}</div>}
                   {purchases.data && purchases.data.length === 0 && (
-                    <div className="p-4 text-stone-500 text-xs italic">Aucun achat pour cette matière.</div>
+                    <div className="p-4 text-stone-500 text-xs italic">{t('materials.no_purchases')}</div>
                   )}
                   {purchases.data?.map(p => (
-                    <PurchaseRow key={p.id} purchase={p} unit={selectedMaterial.unit}
+                    <PurchaseRow key={p.id} purchase={p} unit={selectedMaterial.unit} lang={lang}
                       onDeleted={() => {
                         qc.invalidateQueries({ queryKey: ['materials'] })
                         qc.invalidateQueries({ queryKey: ['material-purchases'] })
@@ -241,19 +244,21 @@ export default function MaterialsPage() {
 }
 
 
-function PurchaseRow({ purchase: p, unit, onDeleted }: {
+function PurchaseRow({ purchase: p, unit, lang, onDeleted }: {
   purchase: MaterialPurchase
   unit: string
+  lang: 'fr' | 'en'
   onDeleted: () => void
 }) {
+  const t = useT()
   async function del() {
-    if (!window.confirm(`Supprimer cet achat (${fmtNum(p.quantity)} ${unit} — ${fmtCAD(p.total_cost)}) ?`)) return
+    if (!window.confirm(`${t('materials.confirm_delete_purchase_prefix')} (${fmtNum(p.quantity)} ${unit} — ${fmtCAD(p.total_cost)}) ?`)) return
     try {
       await deletePurchase(p.id)
       onDeleted()
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      alert(msg || 'Erreur')
+      alert(msg || t('error.generic'))
     }
   }
   return (
@@ -263,7 +268,7 @@ function PurchaseRow({ purchase: p, unit, onDeleted }: {
         <div className="font-bold text-chika-paprika tabular-nums">{fmtCAD(p.total_cost)}</div>
       </div>
       <div className="flex justify-between mt-1 text-stone-500">
-        <span>{fmtDate(p.purchase_date)} · {p.vendor || 'fournisseur ?'}</span>
+        <span>{fmtDate(p.purchase_date, lang)} · {p.vendor || t('materials.vendor_unknown')}</span>
         <span>{fmtCAD(p.unit_price)}/{unit}</span>
       </div>
       {(p.paid_by || p.receipt_url || p.notes) && (
@@ -271,13 +276,13 @@ function PurchaseRow({ purchase: p, unit, onDeleted }: {
           {p.paid_by && <span>👤 {p.paid_by}</span>}
           {p.receipt_url && (
             <a href={p.receipt_url} target="_blank" rel="noopener noreferrer"
-              className="text-chika-paprika underline">📎 reçu</a>
+              className="text-chika-paprika underline">{t('materials.receipt_link')}</a>
           )}
           {p.notes && <span className="italic">{p.notes}</span>}
         </div>
       )}
       <button onClick={del} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-600 hover:underline mt-1">
-        Supprimer
+        {t('materials.delete_link')}
       </button>
     </div>
   )
@@ -299,6 +304,7 @@ function MaterialForm({ editing, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const t = useT()
   const isEdit = !!editing
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MaterialFormData>({
     defaultValues: editing
@@ -327,7 +333,7 @@ function MaterialForm({ editing, onClose, onSaved }: {
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -337,29 +343,29 @@ function MaterialForm({ editing, onClose, onSaved }: {
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">{isEdit ? 'Modifier la matière' : 'Nouvelle matière'}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{isEdit ? t('materials.form.edit_title') : t('materials.new')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && (
           <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>
         )}
 
-        <Field label="Nom de la matière" error={errors.name?.message}>
-          <input {...register('name', { required: 'Requis' })} className={inputCls} placeholder="Cajou cru" />
+        <Field label={t('materials.form.name')} error={errors.name?.message}>
+          <input {...register('name', { required: t('validation.required') })} className={inputCls} placeholder={t('materials.form.name_placeholder')} />
         </Field>
-        <Field label="Unité (kg, g, ml, L, unité…)" error={errors.unit?.message}>
-          <input {...register('unit', { required: 'Requis' })} className={inputCls} placeholder="kg" />
+        <Field label={t('materials.form.unit')} error={errors.unit?.message}>
+          <input {...register('unit', { required: t('validation.required') })} className={inputCls} placeholder="kg" />
         </Field>
-        <Field label="Seuil alerte stock bas (optionnel)">
+        <Field label={t('materials.form.low_stock_threshold')}>
           <input type="number" step="0.01" {...register('low_stock_threshold')} className={inputCls} placeholder="1.5" />
         </Field>
-        <Field label="Notes (optionnel)">
-          <textarea {...register('notes')} rows={2} className={inputCls} placeholder="Fournisseur préféré, qualité, etc." />
+        <Field label={t('label.notes')}>
+          <textarea {...register('notes')} rows={2} className={inputCls} placeholder={t('materials.form.notes_placeholder')} />
         </Field>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
-          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : 'Créer'}</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
+          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : t('action.create')}</Button>
         </div>
       </form>
     </div>
@@ -389,6 +395,7 @@ function PurchaseForm({
   onClose: () => void
   onSaved: () => void
 }) {
+  const t = useT()
   const today = todayISO()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<PurchaseFormData>({
     defaultValues: {
@@ -435,7 +442,7 @@ function PurchaseForm({
     onSuccess: onSaved,
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setServerError(msg || 'Erreur')
+      setServerError(msg || t('error.generic'))
     },
   })
 
@@ -445,16 +452,16 @@ function PurchaseForm({
         onSubmit={handleSubmit(v => mut.mutate(v))}
         className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-stone-900">Approvisionnement</h3>
+          <h3 className="text-lg font-bold text-stone-900">{t('materials.purchase_form.title')}</h3>
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={18} /></button>
         </div>
         {serverError && (
           <div className="px-3 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm">⚠ {serverError}</div>
         )}
 
-        <Field label="Matière" error={errors.material_id?.message}>
-          <select {...register('material_id', { required: 'Requis' })} className={inputCls}>
-            <option value="">Choisir…</option>
+        <Field label={t('materials.purchase_form.material')} error={errors.material_id?.message}>
+          <select {...register('material_id', { required: t('validation.required') })} className={inputCls}>
+            <option value="">{t('materials.purchase_form.choose')}</option>
             {materials.map(m => (
               <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>
             ))}
@@ -462,59 +469,59 @@ function PurchaseForm({
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label={`Quantité ${selectedMat ? `(${selectedMat.unit})` : ''}`} error={errors.quantity?.message}>
+          <Field label={`${t('materials.purchase_form.quantity')} ${selectedMat ? `(${selectedMat.unit})` : ''}`} error={errors.quantity?.message}>
             <input type="number" step="0.001" min="0" {...register('quantity', { required: true, min: 0.001 })} className={inputCls} placeholder="5" />
           </Field>
-          <Field label="Coût total TTC ou HT (CAD)" error={errors.total_cost?.message}>
+          <Field label={t('materials.purchase_form.total_cost')} error={errors.total_cost?.message}>
             <input type="number" step="0.01" min="0" {...register('total_cost', { required: true })} className={inputCls} placeholder="300.00" />
           </Field>
         </div>
 
         {qty > 0 && total > 0 && (
           <div className="bg-chika-creamSoft/50 px-3 py-2 rounded-lg text-xs text-chika-brown">
-            Prix unitaire : <strong className="text-chika-paprika">{fmtCAD(unitPrice)}/{selectedMat?.unit || 'unité'}</strong>
+            {t('materials.purchase_form.unit_price_label')} <strong className="text-chika-paprika">{fmtCAD(unitPrice)}/{selectedMat?.unit || t('materials.purchase_form.unit_fallback')}</strong>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Fournisseur">
+          <Field label={t('materials.purchase_form.vendor')}>
             <input {...register('vendor')} className={inputCls} placeholder="Costco" />
           </Field>
-          <Field label="Date d'achat" error={errors.purchase_date?.message}>
+          <Field label={t('materials.purchase_form.purchase_date')} error={errors.purchase_date?.message}>
             <input type="date" {...register('purchase_date', { required: true })} className={inputCls} />
           </Field>
         </div>
 
-        <Field label="Payé par">
-          <input {...register('paid_by')} className={inputCls} placeholder="Moi / Yannick / Marie..." />
+        <Field label={t('materials.purchase_form.paid_by')}>
+          <input {...register('paid_by')} className={inputCls} placeholder={t('materials.purchase_form.paid_by_placeholder')} />
         </Field>
 
         {/* Reçu : 2 modes */}
         <div className="space-y-2">
-          <label className="text-xs uppercase font-semibold text-stone-500 tracking-wider">Reçu / facture</label>
-          <Field label="URL externe (optionnel)">
+          <label className="text-xs uppercase font-semibold text-stone-500 tracking-wider">{t('materials.purchase_form.receipt_section')}</label>
+          <Field label={t('materials.purchase_form.receipt_url')}>
             <input {...register('receipt_url')} className={inputCls} placeholder="https://drive.google.com/..." />
           </Field>
           <div>
-            <label className="text-[11px] text-stone-500">Ou prendre une photo / uploader :</label>
+            <label className="text-[11px] text-stone-500">{t('materials.purchase_form.receipt_upload_hint')}</label>
             <input type="file" accept="image/*" capture="environment"
               onChange={handleReceiptFile}
               className="block w-full text-xs text-stone-600 file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 file:font-semibold" />
             {uploadedReceipt && (
               <div className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-700">
-                📎 Reçu attaché — sera enregistré avec l'achat
+                {t('materials.purchase_form.receipt_attached')}
               </div>
             )}
           </div>
         </div>
 
-        <Field label="Notes (optionnel)">
-          <textarea {...register('notes')} rows={2} className={inputCls} placeholder="N° facture, conditions..." />
+        <Field label={t('label.notes')}>
+          <textarea {...register('notes')} rows={2} className={inputCls} placeholder={t('materials.purchase_form.notes_placeholder')} />
         </Field>
 
         <div className="flex gap-2 justify-end pt-2 border-t border-stone-200">
-          <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : 'Enregistrer'}</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
+          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '…' : t('action.save')}</Button>
         </div>
       </form>
     </div>
