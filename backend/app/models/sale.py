@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
-    BigInteger, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text,
+    BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,7 +17,11 @@ SALE_STATUSES = ("PENDING", "DELIVERED", "PAID", "CANCELLED")
 # LOSS_ADJUSTMENT = crédit pour perte déclarée sur une ligne déjà facturée
 #   (quantity_boxes = nb d'UNITÉS perdues, pas de caisses ; unit_price =
 #   prix/unité au prorata du prix caisse ; subtotal négatif).
-SALE_ITEM_LINE_TYPES = ("PRODUCT", "LOT_ADJUSTMENT", "LOSS_ADJUSTMENT")
+# MANUAL = ligne saisie à la main, sans produit du catalogue (product_id NULL ;
+#   description = libellé libre ; taxable = case cochée sur la ligne ; aucun
+#   mouvement de stock). Sert à facturer un service, un frais, un lot hors
+#   catalogue…
+SALE_ITEM_LINE_TYPES = ("PRODUCT", "LOT_ADJUSTMENT", "LOSS_ADJUSTMENT", "MANUAL")
 
 # Valid status transitions (server-enforced)
 STATUS_TRANSITIONS: dict[str, set[str]] = {
@@ -51,12 +55,18 @@ class SaleItem(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    # NULL pour une ligne MANUAL (facture sans produit du catalogue).
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id"), nullable=True)
     batch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("batches.id"), nullable=True)
     quantity_boxes: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     line_type: Mapped[str] = mapped_column(String(20), default="PRODUCT", server_default="PRODUCT", nullable=False)
+    # Libellé libre — uniquement pour line_type=MANUAL.
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Taxable — uniquement pour line_type=MANUAL (les lignes produit lisent
+    # products.taxable). NULL pour les autres line_types.
+    taxable: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 

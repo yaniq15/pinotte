@@ -235,14 +235,24 @@ function describeLine(it: SaleItem, t: (key: string, fallback?: string) => strin
   if (it.line_type === 'LOSS_ADJUSTMENT') {
     return `−${it.quantity_boxes} ${t('sales.describe.units_lost')} — ${it.product_name}`
   }
+  if (it.line_type === 'MANUAL') {
+    return `${it.quantity_boxes}× ${it.description}`
+  }
   return `${it.quantity_boxes}× ${it.product_name}`
 }
 
 interface Line {
+  kind: 'product' | 'manual'
   product_id: number | ''
+  description: string
   quantity_boxes: number
   unit_price: number
+  taxable: boolean
 }
+
+const emptyLine = (kind: Line['kind'] = 'product'): Line => ({
+  kind, product_id: '', description: '', quantity_boxes: 1, unit_price: 0, taxable: false,
+})
 
 function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const t = useT()
@@ -253,7 +263,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [clientId, setClientId] = useState('')
   const [saleDate, setSaleDate] = useState(today)
   const [notes, setNotes] = useState('')
-  const [lines, setLines] = useState<Line[]>([{ product_id: '', quantity_boxes: 1, unit_price: 0 }])
+  const [lines, setLines] = useState<Line[]>([emptyLine()])
   const [serverError, setServerError] = useState<string | null>(null)
 
   const selectedClient: Client | undefined = clients.data?.find(c => c.id === Number(clientId))
@@ -295,7 +305,7 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   useEffect(() => {
     if (!selectedClient || !products.data) return
     setLines(ls => ls.map(l => {
-      if (l.product_id === '') return l
+      if (l.kind === 'manual' || l.product_id === '') return l
       const product = products.data!.find(p => p.id === Number(l.product_id))
       const newPrice = calcPriceForProduct(product, selectedClient)
       // N'écrase pas un prix custom (user a tapé un montant différent)
@@ -305,13 +315,32 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
-  function addLine() { setLines(ls => [...ls, { product_id: '', quantity_boxes: 1, unit_price: 0 }]) }
+  function addLine(kind: Line['kind'] = 'product') { setLines(ls => [...ls, emptyLine(kind)]) }
   function removeLine(i: number) { setLines(ls => ls.filter((_, idx) => idx !== i)) }
 
-  const totalHT = lines.reduce((s, l) => s + l.quantity_boxes * l.unit_price, 0)
-  // Taxes ligne par ligne : un produit non taxable (épicerie de base QC) n'a pas de TPS/TVQ.
-  const taxableHT = lines.reduce((s, l) => {
-    if (l.product_id === '') return s
+  /** Bascule produit ↔ manuel : on repart d'une ligne vierge du bon type pour
+   *  ne pas traîner un product_id sur une ligne devenue manuelle (et vice-versa),
+   *  mais on garde la quantité et le prix déjà saisis. */
+  function switchKind(i: number, kind: Line['kind']) {
+    setLines(ls => ls.map((l, idx) => idx === i
+      ? { ...emptyLine(kind), quantity_boxes: l.quantity_boxes, unit_price: l.unit_price }
+      : l))
+  }
+
+  /** Une ligne n'entre dans les totaux (et n'est envoyée) que si elle est
+   *  complète : produit choisi, ou libellé saisi pour une ligne manuelle. */
+  const isLineComplete = (l: Line) =>
+    l.quantity_boxes > 0 && (l.kind === 'manual' ? l.description.trim() !== '' : l.product_id !== '')
+
+  const completeLines = lines.filter(isLineComplete)
+
+  const totalHT = completeLines.reduce((s, l) => s + l.quantity_boxes * l.unit_price, 0)
+  // Taxes ligne par ligne : un produit non taxable (épicerie de base QC) n'a pas
+  // de TPS/TVQ ; une ligne manuelle porte sa propre case « taxable ».
+  const taxableHT = completeLines.reduce((s, l) => {
+    if (l.kind === 'manual') {
+      return l.taxable ? s + l.quantity_boxes * l.unit_price : s
+    }
     const product = products.data?.find(p => p.id === Number(l.product_id))
     return product?.taxable ? s + l.quantity_boxes * l.unit_price : s
   }, 0)
@@ -322,13 +351,19 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const mut = useMutation({
     mutationFn: async () => {
       if (!clientId) throw new Error(t('validation.client_required'))
-      const items: SaleItemPayload[] = lines
-        .filter(l => l.product_id !== '' && l.quantity_boxes > 0)
-        .map(l => ({
-          product_id: Number(l.product_id),
-          quantity_boxes: Number(l.quantity_boxes),
-          unit_price: Number(l.unit_price),
-        }))
+      const items: SaleItemPayload[] = completeLines
+        .map(l => l.kind === 'manual'
+          ? {
+              description: l.description.trim(),
+              taxable: l.taxable,
+              quantity_boxes: Number(l.quantity_boxes),
+              unit_price: Number(l.unit_price),
+            }
+          : {
+              product_id: Number(l.product_id),
+              quantity_boxes: Number(l.quantity_boxes),
+              unit_price: Number(l.unit_price),
+            })
       if (items.length === 0) throw new Error(t('validation.at_least_one_line'))
       const payload: SalePayload = {
         client_id: Number(clientId),
@@ -382,25 +417,61 @@ function SaleForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-stone-700">{t('sales.form.articles_label')}</label>
-            <button onClick={addLine} type="button" className="text-xs text-chika-paprika hover:underline font-semibold">{t('sales.form.add_line')}</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => addLine('product')} type="button" className="text-xs text-chika-paprika hover:underline font-semibold">{t('sales.form.add_line')}</button>
+              <button onClick={() => addLine('manual')} type="button" className="text-xs text-stone-600 hover:underline font-semibold">{t('sales.form.add_manual_line')}</button>
+            </div>
           </div>
           <div className="space-y-2">
             {lines.map((l, i) => (
-              <div key={i} className="grid grid-cols-[1fr,80px,100px,40px] gap-2 items-center">
-                <select value={l.product_id} onChange={e => pickProduct(i, e.target.value)} className={inputCls}>
-                  <option value="">{t('sales.form.product_placeholder')}</option>
-                  {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <input type="number" min="1" value={l.quantity_boxes}
-                  onChange={e => updateLine(i, { quantity_boxes: Number(e.target.value) })}
-                  className={`${inputCls} text-right`} placeholder={t('sales.form.qty_placeholder')} />
-                <input type="number" step="0.01" min="0" value={l.unit_price}
-                  onChange={e => updateLine(i, { unit_price: Number(e.target.value) })}
-                  className={`${inputCls} text-right`} placeholder={t('sales.form.price_placeholder')} />
-                {lines.length > 1 && (
-                  <button onClick={() => removeLine(i)} type="button" className="text-stone-400 hover:text-red-600 p-1">
-                    <Trash2 size={14} />
-                  </button>
+              <div key={i} className="space-y-1">
+                <div className="grid grid-cols-[86px,1fr,70px,90px,32px] gap-2 items-center">
+                  {/* Toggle produit / manuel */}
+                  <div className="inline-flex rounded-lg ring-1 ring-stone-300 overflow-hidden text-[10px] font-semibold">
+                    <button type="button" onClick={() => switchKind(i, 'product')}
+                      className={`flex-1 py-1.5 ${l.kind === 'product' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-500'}`}>
+                      {t('sales.form.kind_product')}
+                    </button>
+                    <button type="button" onClick={() => switchKind(i, 'manual')}
+                      className={`flex-1 py-1.5 border-l border-stone-300 ${l.kind === 'manual' ? 'bg-chika-paprika text-white' : 'bg-white text-stone-500'}`}>
+                      {t('sales.form.kind_manual')}
+                    </button>
+                  </div>
+
+                  {l.kind === 'manual' ? (
+                    <input value={l.description}
+                      onChange={e => updateLine(i, { description: e.target.value })}
+                      className={inputCls} placeholder={t('sales.form.manual_description_placeholder')} />
+                  ) : (
+                    <select value={l.product_id} onChange={e => pickProduct(i, e.target.value)} className={inputCls}>
+                      <option value="">{t('sales.form.product_placeholder')}</option>
+                      {products.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+
+                  <input type="number" min="1" value={l.quantity_boxes}
+                    onChange={e => updateLine(i, { quantity_boxes: Number(e.target.value) })}
+                    className={`${inputCls} text-right`} placeholder={t('sales.form.qty_placeholder')} />
+                  <input type="number" step="0.01" min="0" value={l.unit_price}
+                    onChange={e => updateLine(i, { unit_price: Number(e.target.value) })}
+                    className={`${inputCls} text-right`} placeholder={t('sales.form.price_placeholder')} />
+                  {lines.length > 1 ? (
+                    <button onClick={() => removeLine(i)} type="button" className="text-stone-400 hover:text-red-600 p-1">
+                      <Trash2 size={14} />
+                    </button>
+                  ) : <span />}
+                </div>
+
+                {l.kind === 'manual' && (
+                  <div className="pl-[94px] flex items-center gap-3">
+                    <label className="inline-flex items-center gap-1.5 text-[11px] text-stone-600 cursor-pointer">
+                      <input type="checkbox" checked={l.taxable}
+                        onChange={e => updateLine(i, { taxable: e.target.checked })}
+                        className="accent-chika-paprika" />
+                      {t('sales.form.manual_taxable_label')}
+                    </label>
+                    <span className="text-[10px] text-stone-400 italic">{t('sales.form.manual_no_stock_hint')}</span>
+                  </div>
                 )}
               </div>
             ))}

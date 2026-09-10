@@ -51,10 +51,19 @@ def _current_stock(db: Session, product_id: int) -> int:
 
 
 def create(db: Session, payload: SaleCreate, created_by: User) -> Sale:
-    """Atomic creation: sale + items + stock movements, with stock check."""
-    # 1. Check stock for each product
+    """Atomic creation: sale + items + stock movements, with stock check.
+
+    Deux types de ligne :
+      - ligne produit  (it.product_id renseigné) → vérif stock + mouvement SALE
+      - ligne manuelle (it.description renseignée, product_id NULL) → aucun stock,
+        line_type=MANUAL. Permet de facturer un service / frais / lot hors
+        catalogue sans passer par les produits.
+    """
+    product_lines = [it for it in payload.items if it.product_id is not None]
+
+    # 1. Check stock for each product (lignes produit uniquement)
     requested_by_product: dict[int, int] = {}
-    for it in payload.items:
+    for it in product_lines:
         requested_by_product[it.product_id] = requested_by_product.get(it.product_id, 0) + it.quantity_boxes
 
     for product_id, qty in requested_by_product.items():
@@ -90,6 +99,7 @@ def create(db: Session, payload: SaleCreate, created_by: User) -> Sale:
     db.flush()
 
     for it, subtotal in items_with_subtotals:
+        is_manual = it.product_id is None
         item = SaleItem(
             sale_id=sale.id,
             product_id=it.product_id,
@@ -97,9 +107,14 @@ def create(db: Session, payload: SaleCreate, created_by: User) -> Sale:
             quantity_boxes=it.quantity_boxes,
             unit_price=it.unit_price,
             subtotal=subtotal,
+            line_type="MANUAL" if is_manual else "PRODUCT",
+            description=(it.description.strip() if is_manual and it.description else None),
+            taxable=(bool(it.taxable) if is_manual else None),
         )
         db.add(item)
         db.flush()
+        if is_manual:
+            continue  # aucune ligne manuelle ne touche le stock
         # SALE movement = negative
         db.add(Movement(
             product_id=it.product_id,
@@ -134,8 +149,13 @@ def transition_status(
     if new_status == "PAID":
         sale.payment_date = payment_date or date.today()
     if new_status == "CANCELLED":
-        # Reintroduce stock via RETURN movements
+        # Reintroduce stock via RETURN movements — uniquement les vraies lignes
+        # produit : une ligne MANUAL n'a jamais touché le stock, et une ligne
+        # de révision (LOT/LOSS_ADJUSTMENT) porte un nb de lots/unités, pas de
+        # caisses.
         for item in sale.items:
+            if item.line_type != "PRODUCT" or item.product_id is None:
+                continue
             db.add(Movement(
                 product_id=item.product_id,
                 batch_id=item.batch_id,

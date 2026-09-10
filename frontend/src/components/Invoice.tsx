@@ -57,13 +57,13 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
   const totalHT = Number(sale.total_amount)
   // Taxes calculées uniquement sur la portion taxable (non-épicerie)
   const taxableHT = sale.items.reduce(
-    (s, it) => it.product_taxable ? s + Number(it.subtotal) : s, 0
+    (s, it) => it.taxable ? s + Number(it.subtotal) : s, 0
   )
   const tps = +(taxableHT * TPS_RATE).toFixed(2)
   const tvq = +(taxableHT * TVQ_RATE).toFixed(2)
   const totalTTC = +(totalHT + tps + tvq).toFixed(2)
   const hasTaxableItems = taxableHT > 0
-  const hasNonTaxableItems = sale.items.some(it => !it.product_taxable)
+  const hasNonTaxableItems = sale.items.some(it => !it.taxable)
   const invoiceNum = `INV-${new Date(sale.sale_date).getFullYear()}-${String(sale.id).padStart(4, '0')}`
 
   return (
@@ -112,7 +112,9 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
             <Text style={styles.colTotal}>{t('invoice.col_total')}</Text>
           </View>
           {sale.items.map(it => {
-            const isAdjustment = it.line_type !== 'PRODUCT'
+            // Une ligne manuelle se présente comme une ligne normale sur la
+            // facture (libellé libre) — ce n'est pas une révision.
+            const isAdjustment = it.line_type === 'LOT_ADJUSTMENT' || it.line_type === 'LOSS_ADJUSTMENT'
             const negative = Number(it.subtotal) < 0
             return (
               <View key={it.id} style={styles.tableRow}>
@@ -120,11 +122,15 @@ export function InvoiceDocument({ sale, clientAddress, clientTPSNumber }: Invoic
                   <Text style={{ fontWeight: 'bold' }}>
                     {it.line_type === 'LOT_ADJUSTMENT' && t('invoice.lot_adjustment_prefix')}
                     {it.line_type === 'LOSS_ADJUSTMENT' && t('invoice.loss_adjustment_prefix')}
-                    {it.product_name || `Produit ${it.product_id}`}
+                    {it.description || it.product_name || `Produit ${it.product_id}`}
                   </Text>
                   {!isAdjustment && it.product_sku && <Text style={{ fontSize: 8, color: '#78716c' }}>{t('invoice.sku_label')} {it.product_sku}</Text>}
-                  {!isAdjustment && !it.product_taxable && (
-                    <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>{t('invoice.tax_exempt')}</Text>
+                  {!isAdjustment && !it.taxable && (
+                    <Text style={{ fontSize: 7, color: '#10b981', fontStyle: 'italic' }}>
+                      {/* mention « épicerie QC » réservée aux vrais produits ;
+                          une ligne manuelle peut être un service, pas une denrée. */}
+                      {it.line_type === 'MANUAL' ? t('invoice.not_taxable') : t('invoice.tax_exempt')}
+                    </Text>
                   )}
                   {isAdjustment && it.notes && (
                     <Text style={{ fontSize: 8, color: '#78716c', fontStyle: 'italic' }}>{it.notes}</Text>

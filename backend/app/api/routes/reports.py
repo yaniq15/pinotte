@@ -41,7 +41,12 @@ def _sale_tax_breakdown(sale: Sale) -> dict:
     for it in sale.items:
         sub = Decimal(it.subtotal)
         total_HT += sub
-        if it.product is not None and getattr(it.product, "taxable", False):
+        # ligne produit → products.taxable ; ligne manuelle → sale_items.taxable
+        is_taxable = (
+            getattr(it.product, "taxable", False) if it.product is not None
+            else bool(getattr(it, "taxable", False))
+        )
+        if is_taxable:
             taxable_subtotal += sub
     tps = (taxable_subtotal * TPS_RATE).quantize(Decimal("0.01"))
     tvq = (taxable_subtotal * TVQ_RATE).quantize(Decimal("0.01"))
@@ -341,10 +346,15 @@ def _build_sales_rows(db: Session, start: Optional[date], end: Optional[date]) -
             rows.append(common + ["", "", "", "", "", ""])
             continue
         for it in sale.items:
+            label = it.product.name if it.product else (it.description or "")
+            is_taxable = (
+                getattr(it.product, "taxable", False) if it.product
+                else bool(getattr(it, "taxable", False))
+            )
             rows.append(common + [
                 it.product.sku if it.product else "",
-                it.product.name if it.product else "",
-                "OUI" if (it.product and getattr(it.product, "taxable", False)) else "NON",
+                label,
+                "OUI" if is_taxable else "NON",
                 it.quantity_boxes, float(it.unit_price), float(it.subtotal),
             ])
     return rows

@@ -30,6 +30,10 @@ def _to_read(sale: Sale) -> SaleRead:
             item_read.product_sku = it.product.sku
             item_read.product_taxable = bool(it.product.taxable)
             item_read.product_units_per_box = it.product.units_per_box
+            item_read.taxable = bool(it.product.taxable)
+        else:
+            # ligne manuelle : le taxable vient de la ligne elle-même
+            item_read.taxable = bool(it.taxable)
         out.items.append(item_read)
     return out
 

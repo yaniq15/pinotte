@@ -1,20 +1,22 @@
 import { api } from '../lib/axios'
 
 export type SaleStatus = 'PENDING' | 'DELIVERED' | 'PAID' | 'CANCELLED'
-export type SaleItemLineType = 'PRODUCT' | 'LOT_ADJUSTMENT' | 'LOSS_ADJUSTMENT'
+export type SaleItemLineType = 'PRODUCT' | 'LOT_ADJUSTMENT' | 'LOSS_ADJUSTMENT' | 'MANUAL'
 
 export interface SaleItem {
   id: number
-  product_id: number
+  product_id: number | null
   batch_id: number | null
   quantity_boxes: number
   unit_price: number | string
   subtotal: number | string
   line_type: SaleItemLineType
+  description: string | null
   notes: string | null
   product_name: string | null
   product_sku: string | null
   product_taxable: boolean
+  taxable: boolean
   product_units_per_box: number | null
 }
 
@@ -35,7 +37,9 @@ export interface Sale {
 }
 
 export interface SaleItemPayload {
-  product_id: number
+  product_id?: number | null
+  description?: string
+  taxable?: boolean
   quantity_boxes: number
   unit_price: number
   batch_id?: number | null
